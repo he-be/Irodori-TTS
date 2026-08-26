@@ -1,0 +1,263 @@
+{
+  "tag": "09_e6_c96_cap2944",
+  "timestamp": "2026-08-26T11:30:42",
+  "git_commit": "2f8684b",
+  "env": {
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "torch": "2.10.0+cu128",
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "env_overrides": [
+      "IRODORI_OPT_VRAM_LIMIT_MB=2944",
+      "IRODORI_OPT_GRAPH_SHARED_POOL=0",
+      "IRODORI_OPT_GRAPH_MAX_LATENT=384",
+      "IRODORI_OPT_GRAPH_MAX_ENTRIES=6",
+      "IRODORI_OPT_DECODE_CHUNK=96"
+    ],
+    "alloc_conf": "expandable_segments:True"
+  },
+  "config": {
+    "precision": "bf16",
+    "codec_precision": "fp32",
+    "repeats": 2,
+    "graph_fill": 14,
+    "opt": "reuse_conditions=True crop_text=True fast_sampler=True cuda_graph=True graph_bucket=32 graph_max_entries=6 graph_max_static_mb=256 graph_shared_pool=False graph_max_latent_frames=384 graph_capture_after=1 codec_fold_weight_norm=True reference_cache=True reference_cache_entries=8 cpu_cast=True watermark=False text_bucket=16 speaker_bucket=64 compile_dit=False compile_codec=False decode_chunk_frames=96 decode_overlap_frames=16 decode_autocast_bf16=True encode_chunk_frames=96 encode_overlap_frames=32 vram_limit_mb=2944 empty_cache_after_request=False"
+  },
+  "load_sec": 8.117095490000793,
+  "cuda_mem_after_load": {
+    "allocated": 1963632640,
+    "reserved": 2153775104
+  },
+  "graph_after_fill": {
+    "replay": 228,
+    "capture": 12,
+    "eager": 92,
+    "evict": 6,
+    "fallback": 0,
+    "skip_oversize": 0,
+    "skip_long": 76,
+    "copied_bytes": 0,
+    "entries": 6,
+    "const_sets": 3,
+    "static_bytes": 85350568,
+    "disabled": false
+  },
+  "fill_errors": [
+    "fill[7]: CUDA out of memory. Tried to allocate 56.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 12.39 GiB is free. Including non-PyTorch memory, this process has 3.11 GiB memory in use. 2.88 GiB allowed; Of the allocated memory 2.58 GiB is allocated by PyTorch, with 209.89 MiB allocated in private pools (e.g., CUDA Graphs), and 255.31 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+  ],
+  "results": {
+    "text_max": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 1.674418066002545,
+      "wall_last": 1.6726819760006038,
+      "max_allocated": 2604071936,
+      "max_reserved": 3084910592,
+      "private_pool": 220200960,
+      "smi_used_after": 3241,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 172,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 154,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "caption_max": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 2.081665694997355,
+      "wall_last": 2.081013005998102,
+      "max_allocated": 2604500992,
+      "max_reserved": 3087007744,
+      "private_pool": 220200960,
+      "smi_used_after": 3241,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 252,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 232,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "caption_max_noref": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 1.7517124820005847,
+      "wall_last": 1.750996843999019,
+      "max_allocated": 2604618240,
+      "max_reserved": 3087007744,
+      "private_pool": 220200960,
+      "smi_used_after": 3241,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 332,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 310,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "ref15": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 1.870140437997179,
+      "wall_last": 1.6876163259948953,
+      "max_allocated": 2604303872,
+      "max_reserved": 3087007744,
+      "private_pool": 220200960,
+      "smi_used_after": 3241,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 412,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 388,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "ref30": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 2.0603941430017585,
+      "wall_last": 1.7011594569994486,
+      "max_allocated": 2604617728,
+      "max_reserved": 3087007744,
+      "private_pool": 220200960,
+      "smi_used_after": 3241,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 492,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 466,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "worst": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 2.114389360001951,
+      "wall_last": 2.1146395309988293,
+      "max_allocated": 2604996608,
+      "max_reserved": 3087007744,
+      "private_pool": 220200960,
+      "smi_used_after": 3241,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 572,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 544,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "ref60": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 2.437924268997449,
+      "wall_last": 1.7385620800050674,
+      "max_allocated": 2605259264,
+      "max_reserved": 3087007744,
+      "private_pool": 220200960,
+      "smi_used_after": 3241,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 652,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 622,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "ref120": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 3.2198501949969796,
+      "wall_last": 1.8076940489991102,
+      "max_allocated": 2606541312,
+      "max_reserved": 3084910592,
+      "private_pool": 220200960,
+      "smi_used_after": 3241,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 732,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 700,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "worst_ref120": {
+      "ok": false,
+      "error": "CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 12.35 GiB is free. Including non-PyTorch memory, this process has 3.14 GiB memory in use. 2.88 GiB allowed; Of the allocated memory 2.65 GiB is allocated by PyTorch, with 209.89 MiB allocated in private pools (e.g., CUDA Graphs), and 227.42 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "max_allocated": 2626607104,
+      "max_reserved": 3084910592,
+      "private_pool": 220200960,
+      "smi_used_after": 3241,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 732,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 700,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    }
+  }
+}

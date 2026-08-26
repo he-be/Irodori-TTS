@@ -1,0 +1,245 @@
+{
+  "tag": "09_cap3072_v3",
+  "timestamp": "2026-08-26T11:23:06",
+  "git_commit": "2f8684b",
+  "env": {
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "torch": "2.10.0+cu128",
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "env_overrides": [
+      "IRODORI_OPT_VRAM_LIMIT_MB=3072",
+      "IRODORI_OPT_GRAPH_SHARED_POOL=0",
+      "IRODORI_OPT_GRAPH_MAX_LATENT=384"
+    ],
+    "alloc_conf": "expandable_segments:True"
+  },
+  "config": {
+    "precision": "bf16",
+    "codec_precision": "fp32",
+    "repeats": 2,
+    "graph_fill": 14,
+    "opt": "reuse_conditions=True crop_text=True fast_sampler=True cuda_graph=True graph_bucket=32 graph_max_entries=12 graph_max_static_mb=256 graph_shared_pool=False graph_max_latent_frames=384 graph_capture_after=1 codec_fold_weight_norm=True reference_cache=True reference_cache_entries=8 cpu_cast=True watermark=False text_bucket=16 speaker_bucket=64 compile_dit=False compile_codec=False decode_chunk_frames=96 decode_overlap_frames=16 decode_autocast_bf16=True encode_chunk_frames=96 encode_overlap_frames=32 vram_limit_mb=3072 empty_cache_after_request=False"
+  },
+  "load_sec": 8.220636718993774,
+  "cuda_mem_after_load": {
+    "allocated": 1963632640,
+    "reserved": 2153775104
+  },
+  "graph_after_fill": {
+    "replay": 228,
+    "capture": 12,
+    "eager": 12,
+    "evict": 0,
+    "fallback": 0,
+    "skip_oversize": 0,
+    "skip_long": 0,
+    "copied_bytes": 0,
+    "entries": 12,
+    "const_sets": 6,
+    "static_bytes": 158597232,
+    "disabled": false
+  },
+  "fill_errors": [
+    "fill[5]: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 12.23 GiB is free. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.73 GiB is allocated by PyTorch, with 363.82 MiB allocated in private pools (e.g., CUDA Graphs), and 242.96 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+  ],
+  "results": {
+    "text_max": {
+      "ok": false,
+      "error": "CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 12.23 GiB is free. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.76 GiB is allocated by PyTorch, with 363.82 MiB allocated in private pools (e.g., CUDA Graphs), and 211.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "max_allocated": 2594317824,
+      "max_reserved": 3221225472,
+      "private_pool": 381681664,
+      "smi_used_after": 3367,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 52,
+        "evict": 0,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 38,
+        "copied_bytes": 0,
+        "entries": 12,
+        "const_sets": 6,
+        "static_bytes": 158597232,
+        "disabled": false
+      }
+    },
+    "caption_max": {
+      "ok": false,
+      "error": "CUDA out of memory. Tried to allocate 46.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 12.23 GiB is free. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.71 GiB is allocated by PyTorch, with 363.82 MiB allocated in private pools (e.g., CUDA Graphs), and 261.09 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "max_allocated": 2626306048,
+      "max_reserved": 3208642560,
+      "private_pool": 381681664,
+      "smi_used_after": 3367,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 92,
+        "evict": 0,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 76,
+        "copied_bytes": 0,
+        "entries": 12,
+        "const_sets": 6,
+        "static_bytes": 158597232,
+        "disabled": false
+      }
+    },
+    "caption_max_noref": {
+      "ok": false,
+      "error": "CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 12.23 GiB is free. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.73 GiB is allocated by PyTorch, with 363.82 MiB allocated in private pools (e.g., CUDA Graphs), and 242.09 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "max_allocated": 2552320512,
+      "max_reserved": 3187671040,
+      "private_pool": 381681664,
+      "smi_used_after": 3367,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 132,
+        "evict": 0,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 114,
+        "copied_bytes": 0,
+        "entries": 12,
+        "const_sets": 6,
+        "static_bytes": 158597232,
+        "disabled": false
+      }
+    },
+    "ref15": {
+      "ok": false,
+      "error": "CUDA out of memory. Tried to allocate 76.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 12.27 GiB is free. Including non-PyTorch memory, this process has 3.23 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.67 GiB is allocated by PyTorch, with 363.82 MiB allocated in private pools (e.g., CUDA Graphs), and 265.74 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "max_allocated": 2564668416,
+      "max_reserved": 3229614080,
+      "private_pool": 381681664,
+      "smi_used_after": 3327,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 132,
+        "evict": 0,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 114,
+        "copied_bytes": 0,
+        "entries": 12,
+        "const_sets": 6,
+        "static_bytes": 158597232,
+        "disabled": false
+      }
+    },
+    "ref30": {
+      "ok": false,
+      "error": "CUDA out of memory. Tried to allocate 76.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 12.27 GiB is free. Including non-PyTorch memory, this process has 3.23 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.67 GiB is allocated by PyTorch, with 363.82 MiB allocated in private pools (e.g., CUDA Graphs), and 263.00 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "max_allocated": 2567548416,
+      "max_reserved": 3187671040,
+      "private_pool": 381681664,
+      "smi_used_after": 3327,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 132,
+        "evict": 0,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 114,
+        "copied_bytes": 0,
+        "entries": 12,
+        "const_sets": 6,
+        "static_bytes": 158597232,
+        "disabled": false
+      }
+    },
+    "worst": {
+      "ok": false,
+      "error": "CUDA out of memory. Tried to allocate 76.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 12.27 GiB is free. Including non-PyTorch memory, this process has 3.23 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.67 GiB is allocated by PyTorch, with 363.82 MiB allocated in private pools (e.g., CUDA Graphs), and 262.99 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "max_allocated": 2567551488,
+      "max_reserved": 3208642560,
+      "private_pool": 381681664,
+      "smi_used_after": 3327,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 132,
+        "evict": 0,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 114,
+        "copied_bytes": 0,
+        "entries": 12,
+        "const_sets": 6,
+        "static_bytes": 158597232,
+        "disabled": false
+      }
+    },
+    "ref60": {
+      "ok": false,
+      "error": "CUDA out of memory. Tried to allocate 76.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 12.27 GiB is free. Including non-PyTorch memory, this process has 3.23 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.68 GiB is allocated by PyTorch, with 363.82 MiB allocated in private pools (e.g., CUDA Graphs), and 257.50 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "max_allocated": 2573308416,
+      "max_reserved": 3208642560,
+      "private_pool": 381681664,
+      "smi_used_after": 3327,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 132,
+        "evict": 0,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 114,
+        "copied_bytes": 0,
+        "entries": 12,
+        "const_sets": 6,
+        "static_bytes": 158597232,
+        "disabled": false
+      }
+    },
+    "ref120": {
+      "ok": false,
+      "error": "CUDA out of memory. Tried to allocate 76.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 12.25 GiB is free. Including non-PyTorch memory, this process has 3.25 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.69 GiB is allocated by PyTorch, with 363.82 MiB allocated in private pools (e.g., CUDA Graphs), and 266.52 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "max_allocated": 2584828416,
+      "max_reserved": 3208642560,
+      "private_pool": 381681664,
+      "smi_used_after": 3347,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 132,
+        "evict": 0,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 114,
+        "copied_bytes": 0,
+        "entries": 12,
+        "const_sets": 6,
+        "static_bytes": 158597232,
+        "disabled": false
+      }
+    },
+    "worst_ref120": {
+      "ok": false,
+      "error": "CUDA out of memory. Tried to allocate 76.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 12.25 GiB is free. Including non-PyTorch memory, this process has 3.25 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.69 GiB is allocated by PyTorch, with 363.82 MiB allocated in private pools (e.g., CUDA Graphs), and 266.51 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "max_allocated": 2521916928,
+      "max_reserved": 3166699520,
+      "private_pool": 381681664,
+      "smi_used_after": 3347,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 132,
+        "evict": 0,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 114,
+        "copied_bytes": 0,
+        "entries": 12,
+        "const_sets": 6,
+        "static_bytes": 158597232,
+        "disabled": false
+      }
+    }
+  }
+}

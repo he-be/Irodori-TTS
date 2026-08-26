@@ -199,6 +199,24 @@ class DACVAECodec:
             )
         return normalized
 
+    def _encode_window(self, waveform: torch.Tensor) -> torch.Tensor:
+        """Encode one waveform window to (B, D, T_latent) without chunking."""
+        if self.deterministic_encode:
+            required_paths_present = (
+                hasattr(self.model, "encoder")
+                and hasattr(self.model, "_pad")
+                and hasattr(self.model, "quantizer")
+                and hasattr(self.model.quantizer, "in_proj")
+            )
+            if not required_paths_present:
+                raise RuntimeError(
+                    "deterministic_encode=True requires encoder/_pad/quantizer.in_proj on DACVAE model."
+                )
+            z = self.model.encoder(self.model._pad(waveform))
+            mean, _scale = self.model.quantizer.in_proj(z).chunk(2, dim=1)
+            return mean
+        return self.model.encode(waveform)  # (B, D, T)
+
     @torch.inference_mode()
     def encode_waveform(
         self,
@@ -207,6 +225,8 @@ class DACVAECodec:
         *,
         normalize_db: float | None | object = _CODEC_DEFAULT,
         ensure_max: bool | None = None,
+        chunk_frames: int | None = None,
+        overlap_frames: int = 32,
     ) -> torch.Tensor:
         """
         Input:
@@ -215,6 +235,14 @@ class DACVAECodec:
           ensure_max: If True and normalize_db is None, scale down only when abs peak exceeds 1.0
         Output:
           latent: (B, T_latent, D_latent)
+
+        ``chunk_frames`` mirrors :meth:`decode_latent`: the waveform is encoded in
+        hop-aligned windows with ``overlap_frames`` of context per side and only the
+        centre frames are kept, so the transient VRAM scales with the window instead of
+        the reference length. Loudness normalization stays global (it runs on the whole
+        waveform before windowing), and the tail window keeps the model's own reflect
+        padding, so the result matches a full encode to float error
+        (docs/experiments/09-vram-safe-operating-point.md).
         """
         if waveform.ndim == 2:
             waveform = waveform.unsqueeze(0)
@@ -261,22 +289,32 @@ class DACVAECodec:
             waveform = torch.stack(processed, dim=0).unsqueeze(1)
 
         waveform = waveform.to(self.device, dtype=self.dtype)
-        if self.deterministic_encode:
-            required_paths_present = (
-                hasattr(self.model, "encoder")
-                and hasattr(self.model, "_pad")
-                and hasattr(self.model, "quantizer")
-                and hasattr(self.model.quantizer, "in_proj")
-            )
-            if not required_paths_present:
-                raise RuntimeError(
-                    "deterministic_encode=True requires encoder/_pad/quantizer.in_proj on DACVAE model."
-                )
-            z = self.model.encoder(self.model._pad(waveform))
-            mean, _scale = self.model.quantizer.in_proj(z).chunk(2, dim=1)
-            encoded = mean
-        else:
-            encoded = self.model.encode(waveform)  # (B, D, T)
+        hop = int(self.model.hop_length)
+        samples = int(waveform.shape[-1])
+        total = -(-samples // hop)  # ceil: frames a full encode would produce
+        if chunk_frames is None or chunk_frames <= 0 or total <= chunk_frames + 2 * overlap_frames:
+            encoded = self._encode_window(waveform)
+            return encoded.transpose(1, 2).contiguous()  # (B, T, D)
+
+        # Fixed-size windows (repeating shapes for cuDNN); a short remainder is merged
+        # into the previous window instead of being encoded as a tiny chunk.
+        bounds: list[tuple[int, int]] = []
+        start = 0
+        while start < total:
+            end = min(total, start + chunk_frames)
+            if total - end < max(2 * overlap_frames, chunk_frames // 2):
+                end = total
+            bounds.append((start, end))
+            start = end
+        pieces: list[torch.Tensor] = []
+        for start, end in bounds:
+            lo = max(0, start - overlap_frames)
+            hi = min(total, end + overlap_frames)
+            window = waveform[..., lo * hop : min(samples, hi * hop)]
+            z = self._encode_window(window)
+            pieces.append(z[..., start - lo : end - lo].clone())
+            del z, window
+        encoded = torch.cat(pieces, dim=-1)
         return encoded.transpose(1, 2).contiguous()  # (B, T, D)
 
     @torch.inference_mode()

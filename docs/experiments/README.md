@@ -64,6 +64,8 @@ uv run --no-sync python bench/bench_runtime.py \
 | `check_codec_fold.py` | codec weight_norm fold の bit 一致確認と decode 時間・VRAM |
 | `check_codec_compile.py` | codec decoder の eager / compile / bf16 比較 |
 | `profile_memory.py` | request 中の stage 別 transient VRAM |
+| `stress_vram.py` | 宣言上限入力（text 256 / caption 512 / 参照 15-120 s）での VRAM stress（09） |
+| `check_codec_encode_chunk.py` | 参照 encode の chunk 化の一致確認と時間・VRAM（09） |
 | `gen_quality_wavs.py` | 品質比較用 wav セット生成（watermark なし） |
 | `audio_metrics.py` | 2 つの wav の max abs / SNR / log-mel LSD / 長さ差 |
 
@@ -79,9 +81,15 @@ uv run --no-sync python bench/bench_runtime.py \
   max abs diff ≤ 1e-3**。BF16 では 40 step の Euler 積分がこの誤差をカオス的に増幅するので、
   BF16 同士の bit 比較はしない（02 参照）。
 
-## 現在の既定（07 時点）
+## 現在の既定（09 時点）
 
 `infer.py` / Gradio とも bf16 が既定。`IRODORI_OPT_*` は全部 on（watermark off、codec 重み fp32 +
-decode のみ bf16 autocast、decode chunk 96/16、VRAM 上限 3584 MB）。DiT compile は常駐プロセス向けに
+decode のみ bf16 autocast、decode chunk 96/16、参照 encode chunk 96/32、CUDA Graph は
+entry 6 / static 予算 256 MB / entry ごと pool / latent 384 frame 超は eager、
+**VRAM 上限 3072 MB**）。DiT compile は常駐プロセス向けに
 `IRODORI_OPT_COMPILE_DIT=1`（初回 45〜80 s、07 参照）。
 FP32 で動かすときは `IRODORI_OPT_VRAM_LIMIT_MB=0` にすること（FP32 重みだけで 2.9 GB）。
+
+上限 3072 MB は「チェックポイントが宣言する上限入力（text 256 token / caption 512 token /
+参照 30 s / 生成 30 s）で、CUDA Graph の LRU が埋まった状態」でも通ることを確認した安全運用値
+（09 参照）。LoRA・`num_candidates>1`・watermark 有効はこの余白の外なので、使うなら再計測する。

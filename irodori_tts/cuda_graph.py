@@ -118,6 +118,15 @@ class _GraphEntry:
             t.numel() * t.element_size() for t in (static_x, static_tt, static_dt, static_out)
         )
 
+    def release(self) -> None:
+        """Free the static buffers, then the graph's blocks in the private pool."""
+        self.static_x = None
+        self.static_tt = None
+        self.static_dt = None
+        self.static_out = None
+        self.graph.reset()
+        self.bytes = 0
+
 
 class RFStepGraphRunner:
     def __init__(
@@ -126,10 +135,27 @@ class RFStepGraphRunner:
         device: torch.device,
         max_entries: int = 12,
         capture_after: int = 1,
+        max_static_bytes: int = 0,
+        release_pool_on_evict: bool = True,
+        shared_pool: bool = True,
+        max_latent_frames: int = 0,
     ) -> None:
         self.device = device
         self.max_entries = max(1, int(max_entries))
         self.capture_after = max(0, int(capture_after))
+        # Byte budget for the static buffers (const sets are copies of the context K/V
+        # caches, so they scale with reference/caption length -- a count-only LRU lets
+        # them reach GBs). 0 disables the budget.
+        self.max_static_bytes = max(0, int(max_static_bytes))
+        self.release_pool_on_evict = bool(release_pool_on_evict)
+        # One shared pool lets graphs reuse each other's freed blocks but the pool's
+        # segments are only returned to the driver once *every* graph in it is reset.
+        # Per-entry pools trade that reuse for eviction actually shrinking the footprint.
+        self.shared_pool = bool(shared_pool)
+        # Capture cost (private-pool workspace + static const copy) grows with the latent
+        # length while the replay gain shrinks (long utterances are compute-bound), so
+        # above this many latent frames the step runs eager. 0 = no limit.
+        self.max_latent_frames = max(0, int(max_latent_frames))
         self.pool = torch.cuda.graph_pool_handle()
         self.entries: OrderedDict[tuple, _GraphEntry] = OrderedDict()
         self.const_sets: dict[tuple, _ConstSet] = {}
@@ -144,6 +170,8 @@ class RFStepGraphRunner:
             "eager": 0,
             "evict": 0,
             "fallback": 0,
+            "skip_oversize": 0,
+            "skip_long": 0,
             "copied_bytes": 0,
         }
 
@@ -161,16 +189,23 @@ class RFStepGraphRunner:
             self.variant = variant
 
     def clear(self) -> None:
+        for entry in self.entries.values():
+            entry.release()
         self.entries.clear()
         self.const_sets.clear()
         self.counts.clear()
         # Keep the pool handle: graphs are freed with their entries.
         torch.cuda.synchronize(self.device)
+        if self.release_pool_on_evict:
+            torch.cuda.empty_cache()
 
-    def stats(self) -> dict[str, Any]:
-        static_bytes = sum(e.bytes for e in self.entries.values()) + sum(
+    def static_bytes(self) -> int:
+        return sum(e.bytes for e in self.entries.values()) + sum(
             c.bytes for c in self.const_sets.values()
         )
+
+    def stats(self) -> dict[str, Any]:
+        static_bytes = self.static_bytes()
         return {
             **self._stats,
             "entries": len(self.entries),
@@ -215,6 +250,17 @@ class RFStepGraphRunner:
             count = self.counts.get(dyn_sig, 0)
             self.counts[dyn_sig] = count + 1
             if count < self.capture_after:
+                self._stats["eager"] += 1
+                return state.step(x_t, tt, dt, use_cfg=use_cfg, step_index=alt_index)
+            if self.max_latent_frames and int(x_t.shape[1]) > self.max_latent_frames:
+                self._stats["skip_long"] += 1
+                self._stats["eager"] += 1
+                return state.step(x_t, tt, dt, use_cfg=use_cfg, step_index=alt_index)
+            if self._const_set_too_large(const_sig, const_tree):
+                # A single const set larger than the whole budget (very long reference
+                # and/or caption): replaying would double the context K/V in VRAM for
+                # little gain, so run this shape eagerly.
+                self._stats["skip_oversize"] += 1
                 self._stats["eager"] += 1
                 return state.step(x_t, tt, dt, use_cfg=use_cfg, step_index=alt_index)
             try:
@@ -284,7 +330,7 @@ class RFStepGraphRunner:
         torch.cuda.synchronize(self.device)
 
         graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(graph, pool=self.pool, stream=side):
+        with torch.cuda.graph(graph, pool=self.pool if self.shared_pool else None, stream=side):
             static_out = static_state.step(
                 static_x, static_tt, static_dt, use_cfg=use_cfg, step_index=alt_index
             )
@@ -301,10 +347,29 @@ class RFStepGraphRunner:
         const_set.refs += 1
         self.entries[dyn_sig] = entry
         self._stats["capture"] += 1
-        while len(self.entries) > self.max_entries:
+        evicted = 0
+        while len(self.entries) > 1 and (
+            len(self.entries) > self.max_entries
+            or (self.max_static_bytes > 0 and self.static_bytes() > self.max_static_bytes)
+        ):
             _old_sig, old = self.entries.popitem(last=False)
             old.const_set.refs -= 1
             if old.const_set.refs <= 0:
                 self.const_sets.pop(old.const_set.signature, None)
+            # Without reset() the graph keeps its blocks in the shared private pool, which
+            # never shrinks: the pool would grow with every shape the process ever sees.
+            # Drop the pool-allocated output first so reset() can release its blocks.
+            old.release()
             self._stats["evict"] += 1
+            evicted += 1
+        if evicted and self.release_pool_on_evict:
+            # Private-pool segments are only returned to the driver by empty_cache().
+            torch.cuda.empty_cache()
         return entry
+
+    def _const_set_too_large(self, const_sig: tuple, const_tree: _Tree) -> bool:
+        """True when this const set alone would blow the static byte budget."""
+        if self.max_static_bytes <= 0 or const_sig in self.const_sets:
+            return False
+        need = sum(t.numel() * t.element_size() for t in tree_flatten(const_tree).values())
+        return need > self.max_static_bytes

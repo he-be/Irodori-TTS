@@ -1,0 +1,263 @@
+{
+  "tag": "09_cap3072_v4",
+  "timestamp": "2026-08-26T11:24:19",
+  "git_commit": "2f8684b",
+  "env": {
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "torch": "2.10.0+cu128",
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "env_overrides": [
+      "IRODORI_OPT_VRAM_LIMIT_MB=3072",
+      "IRODORI_OPT_GRAPH_SHARED_POOL=0",
+      "IRODORI_OPT_GRAPH_MAX_LATENT=384",
+      "IRODORI_OPT_GRAPH_MAX_ENTRIES=6",
+      "IRODORI_OPT_DECODE_CHUNK=64"
+    ],
+    "alloc_conf": "expandable_segments:True"
+  },
+  "config": {
+    "precision": "bf16",
+    "codec_precision": "fp32",
+    "repeats": 2,
+    "graph_fill": 14,
+    "opt": "reuse_conditions=True crop_text=True fast_sampler=True cuda_graph=True graph_bucket=32 graph_max_entries=6 graph_max_static_mb=256 graph_shared_pool=False graph_max_latent_frames=384 graph_capture_after=1 codec_fold_weight_norm=True reference_cache=True reference_cache_entries=8 cpu_cast=True watermark=False text_bucket=16 speaker_bucket=64 compile_dit=False compile_codec=False decode_chunk_frames=64 decode_overlap_frames=16 decode_autocast_bf16=True encode_chunk_frames=96 encode_overlap_frames=32 vram_limit_mb=3072 empty_cache_after_request=False"
+  },
+  "load_sec": 8.220828830002574,
+  "cuda_mem_after_load": {
+    "allocated": 1963632640,
+    "reserved": 2153775104
+  },
+  "graph_after_fill": {
+    "replay": 228,
+    "capture": 12,
+    "eager": 332,
+    "evict": 6,
+    "fallback": 0,
+    "skip_oversize": 0,
+    "skip_long": 316,
+    "copied_bytes": 0,
+    "entries": 6,
+    "const_sets": 3,
+    "static_bytes": 85350568,
+    "disabled": false
+  },
+  "fill_errors": [],
+  "results": {
+    "text_max": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 1.559320074004063,
+      "wall_last": 1.557966115004092,
+      "max_allocated": 2591726592,
+      "max_reserved": 3124756480,
+      "private_pool": 220200960,
+      "smi_used_after": 3277,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 412,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 394,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "caption_max": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 1.966283570000087,
+      "wall_last": 1.9607107720003114,
+      "max_allocated": 2592155648,
+      "max_reserved": 3124756480,
+      "private_pool": 220200960,
+      "smi_used_after": 3277,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 492,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 472,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "caption_max_noref": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 1.6319916240026942,
+      "wall_last": 1.6334502600002452,
+      "max_allocated": 2592272896,
+      "max_reserved": 3124756480,
+      "private_pool": 220200960,
+      "smi_used_after": 3277,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 572,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 550,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "ref15": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 1.7419647529968643,
+      "wall_last": 1.5695319049991667,
+      "max_allocated": 2648371712,
+      "max_reserved": 3170893824,
+      "private_pool": 220200960,
+      "smi_used_after": 3321,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 652,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 628,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "ref30": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 1.935204352994333,
+      "wall_last": 1.5797745529998792,
+      "max_allocated": 2651499520,
+      "max_reserved": 3170893824,
+      "private_pool": 220200960,
+      "smi_used_after": 3321,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 732,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 706,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "worst": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 1.9932871259952663,
+      "wall_last": 1.9939438919973327,
+      "max_allocated": 2592651264,
+      "max_reserved": 3170893824,
+      "private_pool": 220200960,
+      "smi_used_after": 3321,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 812,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 784,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "ref60": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 2.3219972160004545,
+      "wall_last": 1.6178151209969656,
+      "max_allocated": 2657642496,
+      "max_reserved": 3170893824,
+      "private_pool": 220200960,
+      "smi_used_after": 3299,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 892,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 862,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "ref120": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 3.103387098002713,
+      "wall_last": 1.6934440080003696,
+      "max_allocated": 2669950976,
+      "max_reserved": 3166699520,
+      "private_pool": 220200960,
+      "smi_used_after": 3317,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 972,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 940,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    },
+    "worst_ref120": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 2.1394643270032248,
+      "wall_last": 2.137606809999852,
+      "max_allocated": 2742298624,
+      "max_reserved": 3208642560,
+      "private_pool": 220200960,
+      "smi_used_after": 3357,
+      "graph": {
+        "replay": 228,
+        "capture": 12,
+        "eager": 1052,
+        "evict": 6,
+        "fallback": 0,
+        "skip_oversize": 0,
+        "skip_long": 1018,
+        "copied_bytes": 0,
+        "entries": 6,
+        "const_sets": 3,
+        "static_bytes": 85350568,
+        "disabled": false
+      }
+    }
+  }
+}

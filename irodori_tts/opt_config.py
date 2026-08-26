@@ -9,7 +9,12 @@ that A/B benchmarks can be run without code changes:
     IRODORI_OPT_FAST_SAMPLER=0     disable sync-free sampler + precomputed masks
     IRODORI_OPT_CUDA_GRAPH=0       disable CUDA Graph replay of the RF step
     IRODORI_OPT_GRAPH_BUCKET=32    latent length bucket for graph signatures
-    IRODORI_OPT_GRAPH_MAX_ENTRIES=12
+    IRODORI_OPT_GRAPH_MAX_ENTRIES=6
+    IRODORI_OPT_GRAPH_MAX_STATIC_MB=256  byte budget for graph static buffers (0 = count-only LRU)
+    IRODORI_OPT_GRAPH_SHARED_POOL=1      share one private pool across graphs (default: one pool per graph,
+                                         so an eviction actually returns its VRAM)
+    IRODORI_OPT_GRAPH_MAX_LATENT=384     run the step eager above this many latent frames (0 = no limit)
+    IRODORI_OPT_GRAPH_RELEASE_POOL=0     skip empty_cache() after a graph eviction
     IRODORI_OPT_CODEC_FOLD_WN=0    disable codec weight-norm folding
     IRODORI_OPT_REF_CACHE=0        disable reference latent / speaker state cache
     IRODORI_OPT_CPU_CAST=0         disable cast-on-CPU model loading
@@ -21,7 +26,9 @@ that A/B benchmarks can be run without code changes:
     IRODORI_OPT_DECODE_CHUNK=96    codec decode window in latent frames, 25 fps (0 = whole utterance)
     IRODORI_OPT_DECODE_OVERLAP=16  overlap per side in latent frames (receptive field ~10)
     IRODORI_OPT_DECODE_AUTOCAST=0  disable bf16 autocast for codec *decode* (default on; encode stays fp32)
-    IRODORI_OPT_VRAM_LIMIT_MB=3584 hard cap for the torch caching allocator (0 = none); CUDA context (~0.5 GB) is extra
+    IRODORI_OPT_ENCODE_CHUNK=96    reference encode window in latent frames (0 = whole clip)
+    IRODORI_OPT_ENCODE_OVERLAP=32  overlap per side for reference encode
+    IRODORI_OPT_VRAM_LIMIT_MB=3072 hard cap for the torch caching allocator (0 = none); CUDA context (~0.5 GB) is extra
     IRODORI_OPT_EMPTY_CACHE=1      release cached blocks after every request (default: off)
 
 The values are read once at first access.
@@ -57,7 +64,11 @@ class OptConfig:
     fast_sampler: bool = True
     cuda_graph: bool = True
     graph_bucket: int = 32
-    graph_max_entries: int = 12
+    graph_max_entries: int = 6
+    graph_max_static_mb: int = 256
+    graph_shared_pool: bool = False
+    graph_max_latent_frames: int = 384
+    graph_release_pool_on_evict: bool = True
     graph_capture_after: int = 1
     codec_fold_weight_norm: bool = True
     reference_cache: bool = True
@@ -71,7 +82,9 @@ class OptConfig:
     decode_chunk_frames: int = 96
     decode_overlap_frames: int = 16
     decode_autocast_bf16: bool = True
-    vram_limit_mb: int = 3584
+    encode_chunk_frames: int = 96
+    encode_overlap_frames: int = 32
+    vram_limit_mb: int = 3072
     empty_cache_after_request: bool = False
 
     @classmethod
@@ -82,7 +95,11 @@ class OptConfig:
             fast_sampler=_env_bool("IRODORI_OPT_FAST_SAMPLER", True),
             cuda_graph=_env_bool("IRODORI_OPT_CUDA_GRAPH", True),
             graph_bucket=max(1, _env_int("IRODORI_OPT_GRAPH_BUCKET", 32)),
-            graph_max_entries=max(1, _env_int("IRODORI_OPT_GRAPH_MAX_ENTRIES", 12)),
+            graph_max_entries=max(1, _env_int("IRODORI_OPT_GRAPH_MAX_ENTRIES", 6)),
+            graph_max_static_mb=max(0, _env_int("IRODORI_OPT_GRAPH_MAX_STATIC_MB", 256)),
+            graph_shared_pool=_env_bool("IRODORI_OPT_GRAPH_SHARED_POOL", False),
+            graph_max_latent_frames=max(0, _env_int("IRODORI_OPT_GRAPH_MAX_LATENT", 384)),
+            graph_release_pool_on_evict=_env_bool("IRODORI_OPT_GRAPH_RELEASE_POOL", True),
             graph_capture_after=max(0, _env_int("IRODORI_OPT_GRAPH_CAPTURE_AFTER", 1)),
             codec_fold_weight_norm=_env_bool("IRODORI_OPT_CODEC_FOLD_WN", True),
             reference_cache=_env_bool("IRODORI_OPT_REF_CACHE", True),
@@ -96,7 +113,9 @@ class OptConfig:
             decode_chunk_frames=max(0, _env_int("IRODORI_OPT_DECODE_CHUNK", 96)),
             decode_overlap_frames=max(0, _env_int("IRODORI_OPT_DECODE_OVERLAP", 16)),
             decode_autocast_bf16=_env_bool("IRODORI_OPT_DECODE_AUTOCAST", True),
-            vram_limit_mb=max(0, _env_int("IRODORI_OPT_VRAM_LIMIT_MB", 3584)),
+            encode_chunk_frames=max(0, _env_int("IRODORI_OPT_ENCODE_CHUNK", 96)),
+            encode_overlap_frames=max(0, _env_int("IRODORI_OPT_ENCODE_OVERLAP", 32)),
+            vram_limit_mb=max(0, _env_int("IRODORI_OPT_VRAM_LIMIT_MB", 3072)),
             empty_cache_after_request=_env_bool("IRODORI_OPT_EMPTY_CACHE", False),
         )
 

@@ -707,6 +707,10 @@ class InferenceRuntime:
                     device=self.model_device,
                     max_entries=int(opt.graph_max_entries),
                     capture_after=int(opt.graph_capture_after),
+                    max_static_bytes=int(opt.graph_max_static_mb) * 2**20,
+                    shared_pool=bool(opt.graph_shared_pool),
+                    max_latent_frames=int(opt.graph_max_latent_frames),
+                    release_pool_on_evict=bool(opt.graph_release_pool_on_evict),
                 )
 
     @classmethod
@@ -1108,6 +1112,10 @@ class InferenceRuntime:
                     sample_rate=int(sr),
                     normalize_db=req.ref_normalize_db,
                     ensure_max=bool(req.ref_ensure_max),
+                    # Windowed encode: the transient no longer scales with the reference
+                    # length (see docs/experiments/09-vram-safe-operating-point.md).
+                    chunk_frames=int(opt.encode_chunk_frames) or None,
+                    overlap_frames=int(opt.encode_overlap_frames),
                 ).cpu()
                 if piece.shape[1] == 0:
                     raise ValueError(f"Reference waveform produced an empty latent: {path}")
