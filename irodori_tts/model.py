@@ -42,14 +42,29 @@ def apply_rotary_emb(x: torch.Tensor, freqs_cis: torch.Tensor) -> torch.Tensor:
     return x_.type_as(x)
 
 
+_TIMESTEP_FREQS_CACHE: dict[tuple[str, int | None, int], torch.Tensor] = {}
+
+
+def _timestep_freqs(device: torch.device, dim: int) -> torch.Tensor:
+    # Cached per (device, dim). The values are computed with exactly the same device ops
+    # as before so results stay bit-identical, but the per-call host->device scalar copy
+    # (a hidden synchronization, and illegal during CUDA Graph capture) is gone.
+    key = (device.type, device.index, int(dim))
+    freqs = _TIMESTEP_FREQS_CACHE.get(key)
+    if freqs is None:
+        half = dim // 2
+        freqs = 1000.0 * torch.exp(
+            -torch.log(torch.tensor(10000.0, device=device, dtype=torch.float32))
+            * torch.arange(half, device=device, dtype=torch.float32)
+            / half
+        )
+        _TIMESTEP_FREQS_CACHE[key] = freqs
+    return freqs
+
+
 def get_timestep_embedding(timestep: torch.Tensor, dim: int) -> torch.Tensor:
     assert dim % 2 == 0
-    half = dim // 2
-    freqs = 1000.0 * torch.exp(
-        -torch.log(torch.tensor(10000.0, device=timestep.device, dtype=torch.float32))
-        * torch.arange(half, device=timestep.device, dtype=torch.float32)
-        / half
-    )
+    freqs = _timestep_freqs(timestep.device, dim)
     args = timestep[:, None].float() * freqs[None, :]
     return torch.cat([torch.cos(args), torch.sin(args)], dim=-1).to(timestep.dtype)
 
@@ -321,11 +336,31 @@ class JointAttention(nn.Module):
         freqs_cis: torch.Tensor,
         self_mask: torch.Tensor | None = None,
         context_kv: tuple[torch.Tensor, ...] | None = None,
+        attn_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         bsz, seq_len, _ = x.shape
         q = self.wq(x).reshape(bsz, seq_len, self.heads, self.head_dim)
         k_self = self.wk(x).reshape(bsz, seq_len, self.heads, self.head_dim)
         v_self = self.wv(x).reshape(bsz, seq_len, self.heads, self.head_dim)
+        if attn_mask is not None and context_kv is not None:
+            # Fast path: precomputed context K/V and a precombined (B,1,1,L) mask.
+            # Key order must match the mask layout: [self, text, speaker?, caption?].
+            q = self.q_norm(q)
+            k_self = self.k_norm(k_self)
+            q = self._apply_rotary_half(q, freqs_cis[:seq_len])
+            k_self = self._apply_rotary_half(k_self, freqs_cis[:seq_len])
+            k = torch.cat([k_self, *context_kv[0::2]], dim=1)
+            v = torch.cat([v_self, *context_kv[1::2]], dim=1)
+            y = F.scaled_dot_product_attention(
+                q.transpose(1, 2),
+                k.transpose(1, 2),
+                v.transpose(1, 2),
+                attn_mask=attn_mask,
+                is_causal=False,
+            ).transpose(1, 2)
+            y = y.reshape(bsz, seq_len, self.dim)
+            y = y * torch.sigmoid(self.gate(x))
+            return self.wo(y)
         if context_kv is None:
             projected = self.project_context_kv(
                 text_context=text_context,
@@ -959,6 +994,7 @@ class DiffusionBlock(nn.Module):
         freqs_cis: torch.Tensor,
         self_mask: torch.Tensor | None = None,
         context_kv: tuple[torch.Tensor, ...] | None = None,
+        attn_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         h, attention_gate = self.attention_adaln(x, cond_embed)
         x = x + self.dropout(
@@ -974,6 +1010,7 @@ class DiffusionBlock(nn.Module):
                 freqs_cis=freqs_cis,
                 self_mask=self_mask,
                 context_kv=context_kv,
+                attn_mask=attn_mask,
             )
         )
 
@@ -1838,6 +1875,7 @@ class TextToLatentRFDiT(nn.Module):
         caption_mask: torch.Tensor | None = None,
         latent_mask: torch.Tensor | None = None,
         context_kv_cache: list[tuple[torch.Tensor, ...]] | None = None,
+        attn_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         t_embed = get_timestep_embedding(t, self.cfg.timestep_embed_dim).to(dtype=x_t.dtype)
         cond_embed = self.cond_module(t_embed)
@@ -1846,6 +1884,8 @@ class TextToLatentRFDiT(nn.Module):
         x = self.in_proj(x_t)
         freqs = self._rope_freqs(x.shape[1], x.device)
         use_checkpoint = self.gradient_checkpointing and self.training and context_kv_cache is None
+        if attn_mask is not None and context_kv_cache is None:
+            raise ValueError("attn_mask fast path requires context_kv_cache.")
         for i, block in enumerate(self.blocks):
             context_kv = context_kv_cache[i] if context_kv_cache is not None else None
             if use_checkpoint:
@@ -1876,11 +1916,59 @@ class TextToLatentRFDiT(nn.Module):
                     freqs_cis=freqs,
                     self_mask=latent_mask,
                     context_kv=context_kv,
+                    attn_mask=attn_mask,
                 )
 
         x = self.out_norm(x)
         x = self.out_proj(x)
         return x.to(dtype=x_t.dtype)
+
+    def build_combined_attn_mask(
+        self,
+        *,
+        latent_len: int,
+        text_mask: torch.Tensor,
+        speaker_mask: torch.Tensor | None,
+        caption_mask: torch.Tensor | None,
+        latent_mask: torch.Tensor | None = None,
+        dtype: torch.dtype | None = None,
+    ) -> torch.Tensor:
+        """
+        Precompute the joint-attention key mask for a whole request.
+
+        Returns an additive float mask of shape (B, 1, 1, L) in ``dtype`` (defaults to
+        the model dtype) with 0 for attendable keys and -inf for masked keys. The key
+        layout is [self, text, speaker?, caption?], matching ``JointAttention``.
+        """
+        bsz = text_mask.shape[0]
+        device = text_mask.device
+        if latent_mask is None:
+            latent_mask = torch.ones((bsz, latent_len), dtype=torch.bool, device=device)
+        parts = [latent_mask, text_mask]
+        if self.cfg.use_speaker_condition_resolved:
+            if speaker_mask is None:
+                raise ValueError("speaker_mask is required when speaker conditioning is enabled.")
+            parts.append(speaker_mask)
+        if self.cfg.use_caption_condition:
+            if caption_mask is None:
+                raise ValueError("caption_mask is required when caption conditioning is enabled.")
+            parts.append(caption_mask)
+        combined = torch.cat([p.to(device=device, dtype=torch.bool) for p in parts], dim=1)
+        out_dtype = self.dtype if dtype is None else dtype
+        additive = torch.zeros(combined.shape, dtype=out_dtype, device=device)
+        additive.masked_fill_(~combined, float("-inf"))
+        return additive[:, None, None, :]
+
+    def prewarm_rope(self, max_latent_len: int, max_speaker_len: int | None = None) -> None:
+        """
+        Materialize RoPE caches up-front so that CUDA Graph capture never observes a
+        cache replacement (a replaced buffer would leave a captured graph reading the
+        old storage).
+        """
+        device = self.device
+        self._rope_freqs(int(max_latent_len), device)
+        if self.speaker_encoder is not None and max_speaker_len is not None:
+            self.speaker_encoder._rope_freqs(int(max_speaker_len), device)
 
     def forward(
         self,

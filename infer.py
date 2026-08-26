@@ -97,8 +97,8 @@ def main() -> None:
     parser.add_argument(
         "--model-precision",
         choices=["fp32", "bf16"],
-        default="fp32",
-        help="Model precision for weights/compute.",
+        default="bf16",
+        help="Model precision for weights/compute (local default: bf16).",
     )
     parser.add_argument(
         "--codec-device",

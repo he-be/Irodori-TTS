@@ -1,0 +1,119 @@
+"""Local inference optimization switches.
+
+This module is intentionally environment-specific (single machine, batch size 1).
+Every switch can be toggled through an ``IRODORI_OPT_*`` environment variable so
+that A/B benchmarks can be run without code changes:
+
+    IRODORI_OPT_REUSE_COND=0       disable duration->sampling condition reuse
+    IRODORI_OPT_CROP_TEXT=0        disable text/caption padding crop
+    IRODORI_OPT_FAST_SAMPLER=0     disable sync-free sampler + precomputed masks
+    IRODORI_OPT_CUDA_GRAPH=0       disable CUDA Graph replay of the RF step
+    IRODORI_OPT_GRAPH_BUCKET=32    latent length bucket for graph signatures
+    IRODORI_OPT_GRAPH_MAX_ENTRIES=12
+    IRODORI_OPT_CODEC_FOLD_WN=0    disable codec weight-norm folding
+    IRODORI_OPT_REF_CACHE=0        disable reference latent / speaker state cache
+    IRODORI_OPT_CPU_CAST=0         disable cast-on-CPU model loading
+    IRODORI_OPT_WATERMARK=1        re-enable SilentCipher watermarking (default: off)
+    IRODORI_OPT_TEXT_BUCKET=16     text/caption token bucket used with CUDA Graph
+    IRODORI_OPT_SPEAKER_BUCKET=64  speaker (patched) token bucket used with CUDA Graph
+    IRODORI_OPT_COMPILE_DIT=1      torch.compile the DiT forward (inside the CUDA Graph)
+    IRODORI_OPT_COMPILE_CODEC=1    torch.compile the codec decoder
+    IRODORI_OPT_DECODE_CHUNK=96    codec decode window in latent frames, 25 fps (0 = whole utterance)
+    IRODORI_OPT_DECODE_OVERLAP=16  overlap per side in latent frames (receptive field ~10)
+    IRODORI_OPT_DECODE_AUTOCAST=0  disable bf16 autocast for codec *decode* (default on; encode stays fp32)
+    IRODORI_OPT_VRAM_LIMIT_MB=3584 hard cap for the torch caching allocator (0 = none); CUDA context (~0.5 GB) is extra
+    IRODORI_OPT_EMPTY_CACHE=1      release cached blocks after every request (default: off)
+
+The values are read once at first access.
+"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, fields
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() not in {"0", "false", "off", "no", ""}
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+@dataclass(frozen=True)
+class OptConfig:
+    reuse_conditions: bool = True
+    crop_text: bool = True
+    fast_sampler: bool = True
+    cuda_graph: bool = True
+    graph_bucket: int = 32
+    graph_max_entries: int = 12
+    graph_capture_after: int = 1
+    codec_fold_weight_norm: bool = True
+    reference_cache: bool = True
+    reference_cache_entries: int = 8
+    cpu_cast: bool = True
+    watermark: bool = False
+    text_bucket: int = 16
+    speaker_bucket: int = 64
+    compile_dit: bool = False
+    compile_codec: bool = False
+    decode_chunk_frames: int = 96
+    decode_overlap_frames: int = 16
+    decode_autocast_bf16: bool = True
+    vram_limit_mb: int = 3584
+    empty_cache_after_request: bool = False
+
+    @classmethod
+    def from_env(cls) -> OptConfig:
+        return cls(
+            reuse_conditions=_env_bool("IRODORI_OPT_REUSE_COND", True),
+            crop_text=_env_bool("IRODORI_OPT_CROP_TEXT", True),
+            fast_sampler=_env_bool("IRODORI_OPT_FAST_SAMPLER", True),
+            cuda_graph=_env_bool("IRODORI_OPT_CUDA_GRAPH", True),
+            graph_bucket=max(1, _env_int("IRODORI_OPT_GRAPH_BUCKET", 32)),
+            graph_max_entries=max(1, _env_int("IRODORI_OPT_GRAPH_MAX_ENTRIES", 12)),
+            graph_capture_after=max(0, _env_int("IRODORI_OPT_GRAPH_CAPTURE_AFTER", 1)),
+            codec_fold_weight_norm=_env_bool("IRODORI_OPT_CODEC_FOLD_WN", True),
+            reference_cache=_env_bool("IRODORI_OPT_REF_CACHE", True),
+            reference_cache_entries=max(1, _env_int("IRODORI_OPT_REF_CACHE_ENTRIES", 8)),
+            cpu_cast=_env_bool("IRODORI_OPT_CPU_CAST", True),
+            watermark=_env_bool("IRODORI_OPT_WATERMARK", False),
+            text_bucket=max(1, _env_int("IRODORI_OPT_TEXT_BUCKET", 16)),
+            speaker_bucket=max(1, _env_int("IRODORI_OPT_SPEAKER_BUCKET", 64)),
+            compile_dit=_env_bool("IRODORI_OPT_COMPILE_DIT", False),
+            compile_codec=_env_bool("IRODORI_OPT_COMPILE_CODEC", False),
+            decode_chunk_frames=max(0, _env_int("IRODORI_OPT_DECODE_CHUNK", 96)),
+            decode_overlap_frames=max(0, _env_int("IRODORI_OPT_DECODE_OVERLAP", 16)),
+            decode_autocast_bf16=_env_bool("IRODORI_OPT_DECODE_AUTOCAST", True),
+            vram_limit_mb=max(0, _env_int("IRODORI_OPT_VRAM_LIMIT_MB", 3584)),
+            empty_cache_after_request=_env_bool("IRODORI_OPT_EMPTY_CACHE", False),
+        )
+
+    def describe(self) -> str:
+        return " ".join(f"{f.name}={getattr(self, f.name)}" for f in fields(self))
+
+
+_CONFIG: OptConfig | None = None
+
+
+def get_opt_config() -> OptConfig:
+    global _CONFIG
+    if _CONFIG is None:
+        _CONFIG = OptConfig.from_env()
+    return _CONFIG
+
+
+def set_opt_config(config: OptConfig) -> None:
+    global _CONFIG
+    _CONFIG = config

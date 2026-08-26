@@ -7,6 +7,7 @@ import math
 import secrets
 import threading
 import time
+from collections import OrderedDict
 from collections.abc import Callable
 from contextlib import nullcontext
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ from .config import ModelConfig, merge_dataclass_overrides
 from .duration import build_duration_features
 from .lora import checkpoint_state_uses_lora, is_lora_adapter_dir, load_lora_adapter
 from .model import TextToLatentRFDiT
+from .opt_config import get_opt_config
 from .quantization import (
     is_torchao_quantized_state_dict,
     parse_quantization_metadata,
@@ -96,7 +98,8 @@ def default_runtime_device() -> str:
 def list_available_runtime_precisions(device: str | torch.device) -> list[str]:
     resolved = resolve_runtime_device(device)
     if resolved.type in ("cuda", "xpu"):
-        return ["fp32", "bf16"]
+        # Local default: bf16 first (Gradio picks choices[0]).
+        return ["bf16", "fp32"]
     return ["fp32"]
 
 
@@ -174,6 +177,19 @@ def find_flattening_point(
         dtype=latent.dtype,
     )
     padded = torch.cat([latent, pad], dim=0)
+    if get_opt_config().fast_sampler:
+        # Vectorized: one std/mean over all sliding windows, a single host sync.
+        windows = padded.unfold(0, window_size, 1)[:total_steps]  # (T, D, W)
+        flat = windows.reshape(windows.shape[0], -1)
+        window_std = flat.std(dim=1, unbiased=False)
+        window_mean = flat.mean(dim=1)
+        matches = (window_std < std_threshold) & (
+            torch.abs(window_mean - target_value) < mean_threshold
+        )
+        hit = torch.nonzero(matches, as_tuple=False)
+        if hit.numel() == 0:
+            return total_steps
+        return int(hit[0, 0].item())
     for i in range(padded.shape[0] - window_size):
         window = padded[i : i + window_size]
         window_std = window.std(unbiased=False)
@@ -181,6 +197,26 @@ def find_flattening_point(
         if window_std < std_threshold and torch.abs(window_mean - target_value) < mean_threshold:
             return int(i)
     return total_steps
+
+
+def _pad_sequence_to_bucket(
+    values: torch.Tensor,
+    mask: torch.Tensor,
+    bucket: int,
+    pad_value: float | int,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Pad (B, L, ...) values / (B, L) bool mask along L to a multiple of ``bucket``."""
+    if bucket <= 1:
+        return values, mask
+    length = int(values.shape[1])
+    target = int(math.ceil(length / bucket) * bucket)
+    if target == length:
+        return values, mask
+    extra = target - length
+    pad_shape = (values.shape[0], extra, *values.shape[2:])
+    pad_values = torch.full(pad_shape, pad_value, dtype=values.dtype, device=values.device)
+    pad_mask = torch.zeros((mask.shape[0], extra), dtype=mask.dtype, device=mask.device)
+    return torch.cat([values, pad_values], dim=1), torch.cat([mask, pad_mask], dim=1)
 
 
 @dataclass(frozen=True)
@@ -283,10 +319,13 @@ def _move_inference_module(
     device: torch.device,
     dtype: torch.dtype,
 ) -> torch.nn.Module:
-    module.to(device=device)
+    if not get_opt_config().cpu_cast:
+        # Legacy order: whole module to device in its source dtype, then cast.
+        module.to(device=device)
     with torch.no_grad():
         for param in module.parameters():
             if param.is_floating_point() and param.dtype != dtype:
+                # Cast + move per tensor so the device never holds the full FP32 copy.
                 param.data = param.data.to(device=device, dtype=dtype)
                 if param.grad is not None:
                     param.grad.data = param.grad.data.to(device=device, dtype=dtype)
@@ -298,6 +337,8 @@ def _move_inference_module(
                     child._buffers[name] = buffer.to(device=device, dtype=dtype)
                 elif buffer.device != device:
                     child._buffers[name] = buffer.to(device=device)
+    # Anything left (integer params, already-matching dtype) moves here.
+    module.to(device=device)
     return module
 
 
@@ -616,10 +657,57 @@ class InferenceRuntime:
         self.default_text_max_len = default_text_max_len
         self.default_caption_max_len = default_caption_max_len
         self.default_max_ref_seconds = float(default_max_ref_seconds)
-        self.watermarker = SilentCipherWatermarker(device=str(self.codec_device))
+        if get_opt_config().watermark:
+            self.watermarker = SilentCipherWatermarker(device=str(self.codec_device))
+        else:
+            # Local-only deployment: watermarking intentionally disabled (saves the
+            # SilentCipher model in VRAM and ~40-170 ms per request).
+            self.watermarker = SilentCipherWatermarker.disabled()
         self._infer_lock = threading.Lock()
         self._model_dtype = next(self.model.parameters()).dtype
         self._lora_adapter_names: dict[str, str] = {}
+        self._graph_runner = None
+        self._active_variant = "base"
+        # Reference caches (see docs/experiments/05-reference-cache.md).
+        self._ref_l1: "OrderedDict[tuple, torch.Tensor]" = OrderedDict()
+        self._ref_l2: "OrderedDict[tuple, tuple[torch.Tensor, torch.Tensor]]" = OrderedDict()
+        self.ref_cache_stats = {"l1_hit": 0, "l1_miss": 0, "l2_hit": 0, "l2_miss": 0}
+        opt = get_opt_config()
+        if self.model_device.type == "cuda":
+            if opt.vram_limit_mb > 0:
+                # Hard cap on the caching allocator: the process never reserves more than this
+                # (the allocator frees cached blocks before raising OOM), so a co-located
+                # llama.cpp VLM can rely on the remainder. CUDA context (~0.4-0.5 GB) is
+                # outside this budget.
+                device_index = (
+                    self.model_device.index
+                    if self.model_device.index is not None
+                    else torch.cuda.current_device()
+                )
+                total = torch.cuda.get_device_properties(device_index).total_memory
+                fraction = min(1.0, float(opt.vram_limit_mb) * 2**20 / float(total))
+                torch.cuda.set_per_process_memory_fraction(fraction, device_index)
+            # RoPE caches must be fully materialized before any CUDA Graph capture.
+            self.model.prewarm_rope(max_latent_len=4096, max_speaker_len=4096)
+            # Keep the eager forward reachable for A/B checks (bench/check_equivalence.py).
+            self._eager_forward_with_encoded_conditions = self.model.forward_with_encoded_conditions
+            if opt.compile_dit and not key.compile_model:
+                # Fuse the elementwise-heavy DiT blocks (RMSNorm/AdaLN/RoPE/gates); dynamic=True
+                # keeps one compiled artifact across latent-length buckets. The compiled callable
+                # is captured inside the CUDA Graph like the eager one.
+                self.model.forward_with_encoded_conditions = torch.compile(
+                    self.model.forward_with_encoded_conditions, dynamic=True
+                )
+            if opt.compile_codec:
+                self.codec.model.decoder = torch.compile(self.codec.model.decoder, dynamic=True)
+            if opt.cuda_graph and not key.compile_model:
+                from .cuda_graph import RFStepGraphRunner
+
+                self._graph_runner = RFStepGraphRunner(
+                    device=self.model_device,
+                    max_entries=int(opt.graph_max_entries),
+                    capture_after=int(opt.graph_capture_after),
+                )
 
     @classmethod
     def from_key(cls, key: RuntimeKey) -> InferenceRuntime:
@@ -654,7 +742,9 @@ class InferenceRuntime:
             model_state,
             assign=model_cfg.use_pretrained_text_encoder or quantized_model,
         )
-        model = model.to(model_device)
+        del model_state
+        if not get_opt_config().cpu_cast:
+            model = model.to(model_device)
         model = _move_inference_module(model, device=model_device, dtype=model_dtype)
         model.eval()
         model = _maybe_compile_inference_model(
@@ -723,6 +813,7 @@ class InferenceRuntime:
             dtype=codec_dtype,
             deterministic_encode=bool(key.codec_deterministic_encode),
             deterministic_decode=bool(key.codec_deterministic_decode),
+            fold_weight_norm=bool(get_opt_config().codec_fold_weight_norm),
         )
         if model_cfg.latent_dim != codec.latent_dim:
             raise ValueError(
@@ -786,6 +877,53 @@ class InferenceRuntime:
                 stage_timings.append(("prepare_lora", stage_sec))
                 log_fn(f"[runtime] prepare_lora: {stage_sec * 1000.0:.1f} ms")
 
+    def _set_variant(self, variant: str) -> None:
+        """Model variant (base / LoRA adapter path). Invalidates captured CUDA Graphs."""
+        if variant != self._active_variant:
+            self._active_variant = variant
+            if self._graph_runner is not None:
+                self._graph_runner.set_variant(variant)
+
+    @staticmethod
+    def _lru_put(cache: "OrderedDict", key: tuple, value: object, limit: int) -> None:
+        cache[key] = value
+        cache.move_to_end(key)
+        while len(cache) > limit:
+            cache.popitem(last=False)
+
+    @staticmethod
+    def _lru_get(cache: "OrderedDict", key: tuple) -> object | None:
+        value = cache.get(key)
+        if value is not None:
+            cache.move_to_end(key)
+        return value
+
+    def _reference_l1_key(
+        self,
+        path: str,
+        *,
+        req: SamplingRequest,
+        max_ref_seconds: float,
+        single_clip: bool,
+    ) -> tuple:
+        resolved = Path(path).expanduser().resolve()
+        stat = resolved.stat()
+        digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+        return (
+            "l1",
+            str(resolved),
+            int(stat.st_size),
+            int(stat.st_mtime_ns),
+            digest,
+            None if req.ref_normalize_db is None else float(req.ref_normalize_db),
+            bool(req.ref_ensure_max),
+            float(max_ref_seconds) if single_clip else None,
+            self.key.codec_repo,
+            str(self.codec.device),
+            str(self.codec.dtype),
+            bool(self.codec.deterministic_encode),
+        )
+
     def _prepare_lora_for_request_inner(
         self,
         adapter_path: str | None,
@@ -794,6 +932,7 @@ class InferenceRuntime:
         log_fn: Callable[[str], None],
     ) -> Any:
         resolved_path = self._resolve_lora_adapter_path(adapter_path)
+        self._set_variant("base" if resolved_path is None else resolved_path)
         if resolved_path is None:
             disable_adapter = getattr(self.model, "disable_adapter", None)
             if callable(disable_adapter):
@@ -932,7 +1071,29 @@ class InferenceRuntime:
                     "info: reference peak safety scaling enabled per clip (ensure_max=True)."
                 )
             latent_pieces = []
+            opt = get_opt_config()
+            use_l1 = bool(opt.reference_cache and self.codec.deterministic_encode)
             for path in wav_paths:
+                l1_key = None
+                if use_l1:
+                    l1_key = self._reference_l1_key(
+                        path,
+                        req=req,
+                        max_ref_seconds=max_ref_seconds,
+                        single_clip=len(wav_paths) == 1,
+                    )
+                    cached_piece = self._lru_get(self._ref_l1, l1_key)
+                    if cached_piece is not None:
+                        self.ref_cache_stats["l1_hit"] += 1
+                        latent_pieces.append(cached_piece)
+                        if (
+                            max_ref_latent_steps is not None
+                            and sum(int(item.shape[1]) for item in latent_pieces)
+                            >= max_ref_latent_steps
+                        ):
+                            break
+                        continue
+                    self.ref_cache_stats["l1_miss"] += 1
                 wav, sr = _load_audio(path)
                 if len(wav_paths) == 1 and max_ref_seconds > 0:
                     max_ref_samples = max(1, int(max_ref_seconds * float(sr)))
@@ -950,6 +1111,10 @@ class InferenceRuntime:
                 ).cpu()
                 if piece.shape[1] == 0:
                     raise ValueError(f"Reference waveform produced an empty latent: {path}")
+                if l1_key is not None:
+                    self._lru_put(
+                        self._ref_l1, l1_key, piece.detach(), int(opt.reference_cache_entries)
+                    )
                 latent_pieces.append(piece)
                 if (
                     max_ref_latent_steps is not None
@@ -1198,6 +1363,20 @@ class InferenceRuntime:
             stage_sec = _measure_end(self.model_device, t0)
             stage_timings.append(("tokenize_text", stage_sec))
             _log(f"[runtime] tokenize_text: {stage_sec * 1000.0:.1f} ms")
+            opt = get_opt_config()
+            if opt.crop_text:
+                # Crop fixed-length padding to the longest real sequence in the batch.
+                # Masked positions never influence real tokens, so this is output
+                # preserving while shrinking encoder work and context K/V length.
+                text_len = max(1, int(text_mask.sum(dim=1).max()))
+                text_ids = text_ids[:, :text_len]
+                text_mask = text_mask[:, :text_len]
+            # With CUDA Graphs, pad lengths to buckets so graph signatures repeat.
+            bucket_pad = self._graph_runner is not None and opt.cuda_graph
+            if bucket_pad:
+                text_ids, text_mask = _pad_sequence_to_bucket(
+                    text_ids, text_mask, int(opt.text_bucket), self.tokenizer.pad_token_id
+                )
             text_ids = text_ids.to(self.model_device)
             text_mask = text_mask.to(self.model_device)
             caption_ids = None
@@ -1214,6 +1393,19 @@ class InferenceRuntime:
                 )
                 if caption_text == "":
                     caption_mask.zero_()
+                if opt.crop_text:
+                    caption_len = (
+                        1 if caption_text == "" else max(1, int(caption_mask.sum(dim=1).max()))
+                    )
+                    caption_ids = caption_ids[:, :caption_len]
+                    caption_mask = caption_mask[:, :caption_len]
+                if bucket_pad:
+                    caption_ids, caption_mask = _pad_sequence_to_bucket(
+                        caption_ids,
+                        caption_mask,
+                        int(opt.text_bucket),
+                        self.caption_tokenizer.pad_token_id,
+                    )
                 caption_ids = caption_ids.to(self.model_device)
                 caption_mask = caption_mask.to(self.model_device)
 
@@ -1235,6 +1427,35 @@ class InferenceRuntime:
                 )
             else:
                 ref_latent, ref_mask = None, None
+            if bucket_pad and ref_latent is not None and ref_mask is not None:
+                unit = int(self.model_cfg.speaker_patch_size) * int(opt.speaker_bucket)
+                ref_latent, ref_mask = _pad_sequence_to_bucket(ref_latent, ref_mask, unit, 0.0)
+            l2_key = None
+            if (
+                opt.reference_cache
+                and ref_latent is not None
+                and ref_mask is not None
+                and not req.no_ref
+            ):
+                l2_key = (
+                    "l2",
+                    hashlib.sha1(ref_latent.contiguous().view(torch.int16 if ref_latent.dtype == torch.bfloat16 else ref_latent.dtype).cpu().numpy().tobytes()).hexdigest(),
+                    tuple(ref_latent.shape),
+                    int(ref_mask.sum().item()),
+                    self._active_variant,
+                    str(self._model_dtype),
+                    int(num_candidates),
+                    str(req.speaker_uncond_mode),
+                )
+                cached_state = self._lru_get(self._ref_l2, l2_key)
+                if cached_state is not None:
+                    self.ref_cache_stats["l2_hit"] += 1
+                    speaker_state_override, speaker_mask_override = cached_state
+                    ref_latent, ref_mask = None, None
+                    l2_key = None
+                    messages.append("info: speaker state served from L2 cache.")
+                else:
+                    self.ref_cache_stats["l2_miss"] += 1
             stage_sec = _measure_end(self.model_device, t0, self.codec_device)
             stage_timings.append(("prepare_reference", stage_sec))
             for msg in messages[msg_count_before_ref:]:
@@ -1242,6 +1463,7 @@ class InferenceRuntime:
             _log(f"[runtime] prepare_reference: {stage_sec * 1000.0:.1f} ms")
 
             hop_length = int(self.codec.model.hop_length)
+            encoded_conditions = None
             if manual_seconds is not None:
                 clamped_seconds = min(max_seconds, max(min_seconds, manual_seconds))
                 if clamped_seconds != manual_seconds:
@@ -1289,6 +1511,26 @@ class InferenceRuntime:
                     speaker_mask_override=speaker_mask_override,
                     speaker_uncond_mode=req.speaker_uncond_mode,
                 )
+                if opt.reuse_conditions:
+                    encoded_conditions = (
+                        duration_text_state,
+                        duration_text_mask,
+                        duration_speaker_state,
+                        _duration_speaker_mask,
+                        _duration_caption_state,
+                        _duration_caption_mask,
+                    )
+                if (
+                    l2_key is not None
+                    and duration_speaker_state is not None
+                    and _duration_speaker_mask is not None
+                ):
+                    self._lru_put(
+                        self._ref_l2,
+                        l2_key,
+                        (duration_speaker_state.detach(), _duration_speaker_mask.detach()),
+                        int(opt.reference_cache_entries),
+                    )
                 pred_log_frames = self.model.predict_duration_log_frames(
                     text_state=duration_text_state,
                     text_mask=duration_text_mask,
@@ -1373,6 +1615,10 @@ class InferenceRuntime:
                 speaker_kv_min_t=speaker_kv_min_t,
                 t_schedule_mode=str(req.t_schedule_mode),
                 sway_coeff=float(req.sway_coeff),
+                encoded_conditions=encoded_conditions,
+                has_caption=has_caption_text,
+                graph_runner=self._graph_runner,
+                graph_bucket=int(opt.graph_bucket),
             )
             stage_sec = _measure_end(self.model_device, t0)
             stage_timings.append(("sample_rf", stage_sec))
@@ -1411,7 +1657,12 @@ class InferenceRuntime:
                     trimmed_audios.append(audio_i[:, :max_samples])
             else:
                 for i in range(num_candidates):
-                    audio_i = self.codec.decode_latent(z[i : i + 1]).cpu()[0]
+                    audio_i = self.codec.decode_latent(
+                        z[i : i + 1],
+                        chunk_frames=int(opt.decode_chunk_frames) or None,
+                        overlap_frames=int(opt.decode_overlap_frames),
+                        autocast_bf16=bool(opt.decode_autocast_bf16),
+                    ).cpu()[0]
                     max_samples = target_samples
                     if bool(req.trim_tail):
                         flattening_point = find_flattening_point(
@@ -1439,6 +1690,8 @@ class InferenceRuntime:
                 stage_sec = _measure_end(self.codec_device, t0)
                 stage_timings.append(("silentcipher_watermark", stage_sec))
                 _log(f"[runtime] silentcipher_watermark: {stage_sec * 1000.0:.1f} ms")
+            elif self.watermarker.intentionally_disabled:
+                messages.append("info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only).")
             else:
                 msg = (
                     "warning: SilentCipher watermark is unavailable; generated audio was not "
@@ -1450,6 +1703,8 @@ class InferenceRuntime:
             total_to_decode = _measure_end(self.model_device, post_load_t0, self.codec_device)
             _log(f"[runtime] total_to_decode: {total_to_decode:.3f} s")
 
+        if opt.empty_cache_after_request and self.model_device.type == "cuda":
+            torch.cuda.empty_cache()
         _log("[runtime] done synthesize")
         return SamplingResult(
             audio=trimmed_audios[0],

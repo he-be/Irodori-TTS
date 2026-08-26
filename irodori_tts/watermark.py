@@ -28,6 +28,14 @@ def _match_original_rank(audio: torch.Tensor, *, reference: torch.Tensor) -> tor
 class SilentCipherWatermarker:
     def __init__(self, *, device: str, model_type: str = "44.1k") -> None:
         self.model = self._load_backend(device=device, model_type=model_type)
+        self.intentionally_disabled = False
+
+    @classmethod
+    def disabled(cls) -> "SilentCipherWatermarker":
+        obj = cls.__new__(cls)
+        obj.model = None
+        obj.intentionally_disabled = True
+        return obj
 
     @staticmethod
     def _load_backend(*, device: str, model_type: str):

@@ -1,0 +1,125 @@
+{
+  "tag": "03_compile_dit_bf16",
+  "timestamp": "2026-08-26T10:21:44",
+  "git_commit": "8224daf",
+  "env": {
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "python": "3.10.20",
+    "torch": "2.10.0+cu128",
+    "cuda": "12.8",
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "capability": [
+      12,
+      0
+    ],
+    "total_memory": 16660430848,
+    "env_overrides": [
+      "IRODORI_OPT_COMPILE_DIT=1"
+    ]
+  },
+  "config": {
+    "checkpoint": "/home/mh/.cache/huggingface/hub/models--Aratako--Irodori-TTS-v4.1-Small/snapshots/2b28324dc263ed5e6638b3cf3dd94c82ead07b4b/model.safetensors",
+    "precision": "bf16",
+    "codec_precision": "fp32",
+    "compile": false,
+    "compile_dynamic": false,
+    "num_steps": 40,
+    "cfg_guidance_mode": "independent",
+    "seed": 1234,
+    "warmup": 3,
+    "repeats": 8,
+    "ref": "/home/mh/dev/Irodori-TTS/outputs/sample.wav"
+  },
+  "load_sec": 8.543830965994857,
+  "warmup_sec_total": 238.8725065000035,
+  "cuda_mem_after_load": {
+    "allocated": 1997576192,
+    "reserved": 2246049792,
+    "max_allocated": 2108190720,
+    "max_reserved": 2246049792
+  },
+  "cuda_mem_after_warmup": {
+    "allocated": 2106840576,
+    "reserved": 6616514560,
+    "max_allocated": 5296010752,
+    "max_reserved": 6616514560
+  },
+  "results": {
+    "short": {
+      "audio_seconds": 6.48,
+      "wall_median": 0.4193753609979467,
+      "wall_p95": 0.4208025970001472,
+      "wall_min": 0.4188551620027283,
+      "rtf_median": 0.06471841990709054,
+      "stages_median_ms": {
+        "tokenize_text": 0.5138425003679004,
+        "prepare_reference": 0.8980705024441704,
+        "predict_duration": 27.66688999690814,
+        "sample_rf": 314.4022095002583,
+        "unpatchify_latent": 0.022186999558471143,
+        "decode_latent": 74.60067899955902
+      },
+      "audio_hashes": [
+        "e5250e5d10e44324395d00116b562b61db753c58d46c05e52661277dd7cf7a01"
+      ],
+      "deterministic": true,
+      "gpu_util": {
+        "mean": 94.82089552238806,
+        "median": 100.0,
+        "p10": 67.0,
+        "max": 100.0,
+        "n": 67.0
+      },
+      "cuda_mem_peak": {
+        "allocated": 2106840576,
+        "reserved": 6616514560,
+        "max_allocated": 2824468480,
+        "max_reserved": 6616514560
+      },
+      "messages": [
+        "info: reference loudness normalize enabled per clip (target_db=-16.00, includes peak safety scaling).",
+        "info: speaker state served from L2 cache.",
+        "info: predicted duration frames=162.0, scale=1.000, using_frames=162 (6.480s).",
+        "info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only)."
+      ]
+    },
+    "long": {
+      "audio_seconds": 28.8,
+      "wall_median": 1.2836246204969939,
+      "wall_p95": 1.2847838119996595,
+      "wall_min": 1.281388652001624,
+      "rtf_median": 0.044570299322812285,
+      "stages_median_ms": {
+        "tokenize_text": 0.8309735021612141,
+        "prepare_reference": 0.9001089965749998,
+        "predict_duration": 28.09227999750874,
+        "sample_rf": 935.7011435022287,
+        "unpatchify_latent": 0.022301996068563312,
+        "decode_latent": 316.596444001334
+      },
+      "audio_hashes": [
+        "aa74f9c2add1a73df4770fca5e4889199c1f2a4f59c7c1ce7ceb9f84ae930362"
+      ],
+      "deterministic": true,
+      "gpu_util": {
+        "mean": 97.17073170731707,
+        "median": 100.0,
+        "p10": 99.0,
+        "max": 100.0,
+        "n": 205.0
+      },
+      "cuda_mem_peak": {
+        "allocated": 2106840576,
+        "reserved": 6616514560,
+        "max_allocated": 5296010752,
+        "max_reserved": 6616514560
+      },
+      "messages": [
+        "info: reference loudness normalize enabled per clip (target_db=-16.00, includes peak safety scaling).",
+        "info: speaker state served from L2 cache.",
+        "info: predicted duration frames=719.8, scale=1.000, using_frames=720 (28.800s).",
+        "info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only)."
+      ]
+    }
+  }
+}

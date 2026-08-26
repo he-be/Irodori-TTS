@@ -1,0 +1,128 @@
+{
+  "tag": "07_final_decode_autocast",
+  "timestamp": "2026-08-26T10:41:30",
+  "git_commit": "8224daf",
+  "env": {
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "python": "3.10.20",
+    "torch": "2.10.0+cu128",
+    "cuda": "12.8",
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "capability": [
+      12,
+      0
+    ],
+    "total_memory": 16660430848,
+    "env_overrides": [
+      "IRODORI_OPT_COMPILE_DIT=1",
+      "IRODORI_OPT_DECODE_AUTOCAST=1"
+    ]
+  },
+  "config": {
+    "checkpoint": "/home/mh/.cache/huggingface/hub/models--Aratako--Irodori-TTS-v4.1-Small/snapshots/2b28324dc263ed5e6638b3cf3dd94c82ead07b4b/model.safetensors",
+    "precision": "bf16",
+    "codec_precision": "fp32",
+    "compile": false,
+    "compile_dynamic": false,
+    "num_steps": 40,
+    "cfg_guidance_mode": "independent",
+    "seed": 1234,
+    "warmup": 3,
+    "repeats": 8,
+    "ref": "/home/mh/dev/Irodori-TTS/outputs/sample.wav"
+  },
+  "load_sec": 8.5979609490023,
+  "warmup_sec_total": 90.71523739900294,
+  "cuda_mem_after_load": {
+    "allocated": 1963632640,
+    "reserved": 2153775104,
+    "max_allocated": 2074836992,
+    "max_reserved": 2153775104
+  },
+  "cuda_mem_after_warmup": {
+    "allocated": 2072569344,
+    "reserved": 2946498560,
+    "max_allocated": 2584298496,
+    "max_reserved": 2946498560
+  },
+  "results": {
+    "short": {
+      "audio_seconds": 6.48,
+      "wall_median": 0.4006291824953223,
+      "wall_p95": 0.40097206700011156,
+      "wall_min": 0.40009134999854723,
+      "rtf_median": 0.06182549112582134,
+      "stages_median_ms": {
+        "tokenize_text": 0.4805095013580285,
+        "prepare_reference": 0.8578345041314606,
+        "predict_duration": 26.855920001253253,
+        "sample_rf": 313.93871500040404,
+        "unpatchify_latent": 0.019275998056400567,
+        "decode_latent": 57.2918869984278
+      },
+      "audio_hashes": [
+        "b0a9700613070b2ab52c0dfcb9a83cd21eb13ea8ae52de57302a8a91fe42d284"
+      ],
+      "deterministic": true,
+      "gpu_util": {
+        "smi_mem_used_max_mib": 3079.0,
+        "mean": 94.765625,
+        "median": 99.0,
+        "p10": 69.0,
+        "max": 100.0,
+        "n": 64.0
+      },
+      "cuda_mem_peak": {
+        "allocated": 2072569344,
+        "reserved": 2946498560,
+        "max_allocated": 2533944832,
+        "max_reserved": 2946498560
+      },
+      "messages": [
+        "info: reference loudness normalize enabled per clip (target_db=-16.00, includes peak safety scaling).",
+        "info: speaker state served from L2 cache.",
+        "info: predicted duration frames=162.0, scale=1.000, using_frames=162 (6.480s).",
+        "info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only)."
+      ]
+    },
+    "long": {
+      "audio_seconds": 28.8,
+      "wall_median": 1.2335495175029791,
+      "wall_p95": 1.24596256899531,
+      "wall_min": 1.2321473479969427,
+      "rtf_median": 0.04283158046885344,
+      "stages_median_ms": {
+        "tokenize_text": 0.7985679985722527,
+        "prepare_reference": 0.8984854976006318,
+        "predict_duration": 27.140305002831155,
+        "sample_rf": 932.1362509981554,
+        "unpatchify_latent": 0.019036000594496727,
+        "decode_latent": 271.1675169994123
+      },
+      "audio_hashes": [
+        "929eb21ac1c815f1f510704dc503dfb7422ad2a5a218afefe0cd0519b06efee8"
+      ],
+      "deterministic": true,
+      "gpu_util": {
+        "smi_mem_used_max_mib": 3079.0,
+        "mean": 92.42639593908629,
+        "median": 100.0,
+        "p10": 64.0,
+        "max": 100.0,
+        "n": 197.0
+      },
+      "cuda_mem_peak": {
+        "allocated": 2072569344,
+        "reserved": 2946498560,
+        "max_allocated": 2584298496,
+        "max_reserved": 2946498560
+      },
+      "messages": [
+        "info: reference loudness normalize enabled per clip (target_db=-16.00, includes peak safety scaling).",
+        "info: speaker state served from L2 cache.",
+        "info: predicted duration frames=719.8, scale=1.000, using_frames=720 (28.800s).",
+        "info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only)."
+      ]
+    }
+  }
+}

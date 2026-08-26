@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,6 +35,27 @@ def unpatchify_latent(patched: torch.Tensor, patch_size: int, latent_dim: int) -
     return patched.reshape(patched.shape[0], patched.shape[1] * patch_size, latent_dim)
 
 
+def fold_weight_norm_(model: torch.nn.Module) -> int:
+    """
+    Fold legacy ``torch.nn.utils.weight_norm`` hooks into plain weights (in place).
+
+    At inference the weight ``g * v / ||v||`` is recomputed on every forward by a
+    pre-hook; folding it once yields bit-identical weights and removes those kernels.
+    Only modules carrying a ``WeightNorm`` hook are touched.
+    """
+    from torch.nn.utils.weight_norm import WeightNorm, remove_weight_norm
+
+    count = 0
+    for module in model.modules():
+        names = [
+            hook.name for hook in module._forward_pre_hooks.values() if isinstance(hook, WeightNorm)
+        ]
+        for name in names:
+            remove_weight_norm(module, name=name)
+            count += 1
+    return count
+
+
 @dataclass
 class DACVAECodec:
     model: torch.nn.Module
@@ -54,6 +76,7 @@ class DACVAECodec:
         deterministic_encode: bool = True,
         deterministic_decode: bool = True,
         normalize_db: float | None = -16.0,
+        fold_weight_norm: bool = True,
     ) -> DACVAECodec:
         # Prefer installed package; fallback to local clone at ../dacvae.
         try:
@@ -76,6 +99,9 @@ class DACVAECodec:
                 pass
 
         model = DACVAE.load(location).eval().to(device)
+        if fold_weight_norm:
+            folded = fold_weight_norm_(model)
+            print(f"[codec] folded weight_norm on {folded} conv layers", flush=True)
         if dtype is not None:
             model = model.to(dtype=dtype)
 
@@ -254,17 +280,63 @@ class DACVAECodec:
         return encoded.transpose(1, 2).contiguous()  # (B, T, D)
 
     @torch.inference_mode()
-    def decode_latent(self, latent: torch.Tensor) -> torch.Tensor:
+    def decode_latent(
+        self,
+        latent: torch.Tensor,
+        *,
+        chunk_frames: int | None = None,
+        overlap_frames: int = 64,
+        autocast_bf16: bool = False,
+    ) -> torch.Tensor:
         """
         Input:
           latent: (B, T, D)
         Output:
           audio: (B, 1, samples)
+
+        With ``chunk_frames`` the latent is decoded in overlapping windows and only the
+        centre of each window is kept. The decoder is a finite-receptive-field conv stack,
+        so with ``overlap_frames`` well above that field the result matches full decode
+        (verified in docs/experiments/06-memory.md) while the transient VRAM scales with
+        the window instead of the utterance length.
         """
         if latent.ndim != 3:
             raise ValueError(f"Expected latent ndim=3, got shape={tuple(latent.shape)}")
         z = latent.transpose(1, 2).contiguous().to(self.device, dtype=self.dtype)  # (B, D, T)
-        return self.model.decode(z)
+        total = int(z.shape[-1])
+        if autocast_bf16 and self.device.type == "cuda" and self.dtype == torch.float32:
+            # Decode-only reduced precision: weights stay fp32 (so reference *encode* is
+            # unchanged); convs run in bf16 and activations are half the size.
+            with torch.autocast("cuda", dtype=torch.bfloat16):
+                out = self.decode_latent(
+                    latent, chunk_frames=chunk_frames, overlap_frames=overlap_frames
+                )
+            return out.float()
+        if chunk_frames is None or chunk_frames <= 0 or total <= chunk_frames + 2 * overlap_frames:
+            return self.model.decode(z)
+        hop = int(self.model.hop_length)
+        pieces: list[torch.Tensor] = []
+        # Fixed-size windows (so cuDNN sees repeating shapes); a short remainder is merged
+        # into the previous window instead of being decoded as a tiny chunk.
+        bounds: list[tuple[int, int]] = []
+        start = 0
+        while start < total:
+            end = min(total, start + chunk_frames)
+            if total - end < max(2 * overlap_frames, chunk_frames // 2):
+                end = total
+            bounds.append((start, end))
+            start = end
+        for start, end in bounds:
+            lo = max(0, start - overlap_frames)
+            hi = min(total, end + overlap_frames)
+            audio = self.model.decode(z[:, :, lo:hi])
+            keep_from = (start - lo) * hop
+            keep_to = keep_from + (end - start) * hop
+            if hi == total:
+                keep_to = audio.shape[-1]  # keep the true tail as decoded
+            pieces.append(audio[:, :, keep_from:keep_to])
+            del audio
+        return torch.cat(pieces, dim=-1)
 
     def encode_file(self, path: str | Path) -> torch.Tensor:
         try:

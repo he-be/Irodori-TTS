@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import os as _os
+
+# Persistent server: the one-time DiT compile (~45-80 s at first request) pays for itself.
+# Override with IRODORI_OPT_COMPILE_DIT=0 if you want the first request to be fast instead.
+_os.environ.setdefault("IRODORI_OPT_COMPILE_DIT", "1")
+
 import argparse
 from datetime import datetime
 from pathlib import Path
