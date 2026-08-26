@@ -1,0 +1,156 @@
+{
+ "scenario": "tts_only",
+ "duration_s": 0.0,
+ "gpu": {},
+ "gpu_whole_run": {
+  "mem_max_mib": 15776,
+  "mem_median_mib": 15181.0,
+  "util_mean": 0,
+  "n": 62
+ },
+ "tts": {
+  "count": 0,
+  "wall": null,
+  "rtf": null,
+  "audio_seconds_total": 0,
+  "peak_alloc_mib": 0,
+  "peak_reserved_mib": 0,
+  "load_wall": null
+ },
+ "vlm": {
+  "text_count": 0,
+  "image_count": 0,
+  "prefill_tps": null,
+  "gen_tps": null,
+  "text_wall": null,
+  "image_wall": null
+ },
+ "failures": {
+  "total": 2,
+  "oom": 1,
+  "crash": 0,
+  "first": [
+   {
+    "event": "tts_load",
+    "ok": false,
+    "id": null,
+    "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 13.31 MiB is free. Process 118971 has 14.80 GiB memory in use. Including non-PyTorch memory, this process has 690.00 MiB memory in use. Of the allocated memory 559.57 MiB is allocated by PyTorch, and 2.43 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variable",
+    "oom": true,
+    "wall": 5.01810449900222,
+    "traceback": "_device, dtype=model_dtype)\n  File \"/home/mh/dev/Irodori-TTS/irodori_tts/inference_runtime.py\", line 329, in _move_inference_module\n    param.data = param.data.to(device=device, dtype=dtype)\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 13.31 MiB is free. Process 118971 has 14.80 GiB memory in use. Including non-PyTorch memory, this process has 690.00 MiB memory in use. Of the allocated memory 559.57 MiB is allocated by PyTorch, and 2.43 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)\n",
+    "proc_start_wall": 6.199765962999663,
+    "t": 6.201
+   },
+   {
+    "event": "aborted",
+    "ok": false,
+    "error": "TTS failed to load",
+    "t": 6.201
+   }
+  ]
+ },
+ "events": [
+  {
+   "event": "tts_load",
+   "ok": false,
+   "id": null,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 13.31 MiB is free. Process 118971 has 14.80 GiB memory in use. Including non-PyTorch memory, this process has 690.00 MiB memory in use. Of the allocated memory 559.57 MiB is allocated by PyTorch, and 2.43 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variable",
+   "oom": true,
+   "wall": 5.01810449900222,
+   "traceback": "_device, dtype=model_dtype)\n  File \"/home/mh/dev/Irodori-TTS/irodori_tts/inference_runtime.py\", line 329, in _move_inference_module\n    param.data = param.data.to(device=device, dtype=dtype)\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 13.31 MiB is free. Process 118971 has 14.80 GiB memory in use. Including non-PyTorch memory, this process has 690.00 MiB memory in use. Of the allocated memory 559.57 MiB is allocated by PyTorch, and 2.43 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)\n",
+   "proc_start_wall": 6.199765962999663,
+   "t": 6.201
+  },
+  {
+   "event": "aborted",
+   "ok": false,
+   "error": "TTS failed to load",
+   "t": 6.201
+  },
+  {
+   "event": "stats",
+   "ok": true,
+   "alloc_mib": 0.0,
+   "reserved_mib": 562.0,
+   "peak_alloc_mib": 559.5673828125,
+   "peak_reserved_mib": 562.0,
+   "t": 6.235
+  },
+  {
+   "event": "tts_unload",
+   "ok": true,
+   "wall": 0.8652911309982301,
+   "rc": 0,
+   "t": 7.1
+  }
+ ],
+ "gpu_timeline": [
+  [
+   0.03,
+   0,
+   15181
+  ],
+  [
+   1.03,
+   0,
+   15181
+  ],
+  [
+   2.03,
+   0,
+   15181
+  ],
+  [
+   3.04,
+   0,
+   15181
+  ],
+  [
+   4.04,
+   0,
+   15181
+  ],
+  [
+   5.04,
+   0,
+   15181
+  ],
+  [
+   6.04,
+   0,
+   15556
+  ],
+  [
+   7.04,
+   0,
+   15876
+  ],
+  [
+   8.05,
+   0,
+   15181
+  ]
+ ],
+ "tag": "10_fit_hazard",
+ "args": {
+  "scenario": "tts_only",
+  "duration": 30.0,
+  "vlm_url": "http://127.0.0.1:8080",
+  "vlm_model": null,
+  "vlm_n_predict": 128,
+  "vlm_gap": 0.0,
+  "image": "/home/mh/dev/Irodori-TTS/bench/assets/coexist_image.png",
+  "ref": null,
+  "playback": true,
+  "churn_synths": 3,
+  "swap_gap": 5.0,
+  "sample_ms": 100,
+  "max_failures": 5,
+  "env": [
+   "IRODORI_OPT_CUDA_GRAPH=0"
+  ],
+  "tag": "10_fit_hazard",
+  "output": "/tmp/claude-1000/-home-mh-dev-Irodori-TTS/7d5f050a-0c9c-41c2-a37e-f819f02ba545/scratchpad/coexist/fit_hazard.json"
+ },
+ "gpu_timeline_note": "downsampled to ~1 Hz"
+}

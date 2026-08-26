@@ -28,7 +28,9 @@ that A/B benchmarks can be run without code changes:
     IRODORI_OPT_DECODE_AUTOCAST=0  disable bf16 autocast for codec *decode* (default on; encode stays fp32)
     IRODORI_OPT_ENCODE_CHUNK=96    reference encode window in latent frames (0 = whole clip)
     IRODORI_OPT_ENCODE_OVERLAP=32  overlap per side for reference encode
-    IRODORI_OPT_VRAM_LIMIT_MB=3072 hard cap for the torch caching allocator (0 = none); CUDA context (~0.5 GB) is extra
+    IRODORI_OPT_VRAM_LIMIT_MB=3840 hard cap for the torch caching allocator (0 = none); CUDA context (~0.5 GB) is extra
+                                   3840 covers CUDA Graph pools; with IRODORI_OPT_CUDA_GRAPH=0 the
+                                   steady state fits in 3072 (see docs/experiments/10)
     IRODORI_OPT_EMPTY_CACHE=1      release cached blocks after every request (default: off)
 
 The values are read once at first access.
@@ -84,7 +86,7 @@ class OptConfig:
     decode_autocast_bf16: bool = True
     encode_chunk_frames: int = 96
     encode_overlap_frames: int = 32
-    vram_limit_mb: int = 3072
+    vram_limit_mb: int = 3840
     empty_cache_after_request: bool = False
 
     @classmethod
@@ -115,7 +117,7 @@ class OptConfig:
             decode_autocast_bf16=_env_bool("IRODORI_OPT_DECODE_AUTOCAST", True),
             encode_chunk_frames=max(0, _env_int("IRODORI_OPT_ENCODE_CHUNK", 96)),
             encode_overlap_frames=max(0, _env_int("IRODORI_OPT_ENCODE_OVERLAP", 32)),
-            vram_limit_mb=max(0, _env_int("IRODORI_OPT_VRAM_LIMIT_MB", 3072)),
+            vram_limit_mb=max(0, _env_int("IRODORI_OPT_VRAM_LIMIT_MB", 3840)),
             empty_cache_after_request=_env_bool("IRODORI_OPT_EMPTY_CACHE", False),
         )
 

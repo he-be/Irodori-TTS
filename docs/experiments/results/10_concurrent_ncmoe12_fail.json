@@ -1,0 +1,2703 @@
+{
+ "scenario": "concurrent",
+ "duration_s": 182.9,
+ "gpu": {
+  "mem_max_mib": 15206,
+  "mem_median_mib": 15098.0,
+  "util_mean": 63.0,
+  "n": 1826
+ },
+ "gpu_whole_run": {
+  "mem_max_mib": 15206,
+  "mem_median_mib": 15090.0,
+  "util_mean": 59.5,
+  "n": 1954
+ },
+ "tts": {
+  "count": 12,
+  "wall": {
+   "n": 12,
+   "median": 0.899,
+   "p95": 1.358,
+   "max": 2.111
+  },
+  "rtf": {
+   "n": 12,
+   "median": 0.101,
+   "p95": 0.112,
+   "max": 0.201
+  },
+  "audio_seconds_total": 121.6,
+  "peak_alloc_mib": 2594.8,
+  "peak_reserved_mib": 3072.0,
+  "load_wall": {
+   "n": 1,
+   "median": 9.811,
+   "p95": 9.811,
+   "max": 9.811
+  }
+ },
+ "vlm": {
+  "text_count": 43,
+  "image_count": 22,
+  "prefill_tps": {
+   "n": 43,
+   "median": 105.497,
+   "p95": 727.043,
+   "max": 728.147
+  },
+  "gen_tps": {
+   "n": 43,
+   "median": 50.701,
+   "p95": 79.898,
+   "max": 89.535
+  },
+  "text_wall": {
+   "n": 43,
+   "median": 3.222,
+   "p95": 6.829,
+   "max": 9.542
+  },
+  "image_wall": {
+   "n": 22,
+   "median": 2.131,
+   "p95": 3.009,
+   "max": 3.555
+  }
+ },
+ "failures": {
+  "total": 60,
+  "oom": 58,
+  "crash": 0,
+  "first": [
+   {
+    "event": "vlm_text",
+    "ok": false,
+    "wall": 0.811976222001249,
+    "error": "HTTP Error 500: Internal Server Error",
+    "i": 21,
+    "t": 62.656
+   },
+   {
+    "event": "vlm_text",
+    "ok": false,
+    "wall": 4.342866922997928,
+    "error": "HTTP Error 500: Internal Server Error",
+    "i": 28,
+    "t": 82.063
+   },
+   {
+    "event": "synth",
+    "ok": false,
+    "id": 12,
+    "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 46.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 723.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.23 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.62 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 355.52 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+    "oom": true,
+    "wall": 0.9239866249990882,
+    "traceback": ".venv/lib/python3.10/site-packages/torch/nn/modules/conv.py\", line 370, in _conv_forward\n    return F.conv1d(\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 46.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 723.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.23 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.62 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 355.52 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)\n",
+    "i": 12,
+    "t": 147.443
+   },
+   {
+    "event": "synth",
+    "ok": false,
+    "id": 13,
+    "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 693.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.60 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 401.30 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+    "oom": true,
+    "wall": 1.016054248000728,
+    "traceback": ".venv/lib/python3.10/site-packages/torch/nn/modules/conv.py\", line 370, in _conv_forward\n    return F.conv1d(\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 693.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.60 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 401.30 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)\n",
+    "i": 13,
+    "t": 148.46
+   },
+   {
+    "event": "synth",
+    "ok": false,
+    "id": 14,
+    "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 693.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.60 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 401.24 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+    "oom": true,
+    "wall": 1.0219544979991042,
+    "traceback": ".venv/lib/python3.10/site-packages/torch/nn/modules/conv.py\", line 370, in _conv_forward\n    return F.conv1d(\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 693.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.60 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 401.24 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)\n",
+    "i": 14,
+    "t": 149.482
+   }
+  ]
+ },
+ "events": [
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 0.3218673139999737,
+   "prompt_n": 3,
+   "prompt_tps": 80.84292220216119,
+   "gen_n": 8,
+   "gen_tps": 25.179131535783146,
+   "t": 0.323
+  },
+  {
+   "event": "tts_load",
+   "ok": true,
+   "wall": 9.810900817006768,
+   "alloc_mib": 1872.666015625,
+   "reserved_mib": 2054.0,
+   "proc_start_wall": 11.158666919000098,
+   "t": 11.481
+  },
+  {
+   "event": "synth",
+   "ok": true,
+   "id": -1,
+   "wall": 1.3464435109999613,
+   "audio_seconds": 6.48,
+   "rtf": 0.2077844924382656,
+   "stages_ms": {
+    "tokenize_text": 1.1452170001575723,
+    "prepare_reference": 103.38427999522537,
+    "predict_duration": 389.36368100257823,
+    "sample_rf": 523.6954089996289,
+    "unpatchify_latent": 0.01668200275162235,
+    "decode_latent": 327.84769700083416
+   },
+   "peak_alloc_mib": 2363.4521484375,
+   "peak_reserved_mib": 2510.0,
+   "warmup": true,
+   "t": 12.828
+  },
+  {
+   "event": "synth",
+   "ok": true,
+   "id": 0,
+   "wall": 0.5491529069986427,
+   "audio_seconds": 6.48,
+   "rtf": 0.08474581898127202,
+   "stages_ms": {
+    "tokenize_text": 0.49846900219563395,
+    "prepare_reference": 1.1072260022046976,
+    "predict_duration": 34.439354996720795,
+    "sample_rf": 447.9789190008887,
+    "unpatchify_latent": 0.022030995751265436,
+    "decode_latent": 64.02228400111198
+   },
+   "peak_alloc_mib": 2363.43603515625,
+   "peak_reserved_mib": 2514.0,
+   "i": 0,
+   "t": 13.379
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.9595755599948461,
+   "prompt_n": 11,
+   "prompt_tps": 49.5283549832279,
+   "gen_n": 72,
+   "gen_tps": 40.99323727058943,
+   "i": 0,
+   "t": 14.788
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.7210599959944375,
+   "prompt_n": 1036,
+   "prompt_tps": 630.3700868705959,
+   "gen_n": 2,
+   "gen_tps": 17.097231958145976,
+   "i": 1,
+   "t": 16.509
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 2.1572793060040567,
+   "prompt_n": 295,
+   "gen_n": 39,
+   "i": 2,
+   "t": 18.667
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.718288935997407,
+   "prompt_n": 11,
+   "prompt_tps": 95.09647970122415,
+   "gen_n": 128,
+   "gen_tps": 79.89828382261071,
+   "i": 3,
+   "t": 20.386
+  },
+  {
+   "event": "synth",
+   "ok": true,
+   "id": 1,
+   "wall": 0.7598448869975982,
+   "audio_seconds": 7.32,
+   "rtf": 0.1038039463111473,
+   "stages_ms": {
+    "tokenize_text": 0.9213750017806888,
+    "prepare_reference": 1.4190529982442968,
+    "predict_duration": 43.12669699720573,
+    "sample_rf": 632.7425349954865,
+    "unpatchify_latent": 0.019516002794262022,
+    "decode_latent": 79.89989800262265
+   },
+   "peak_alloc_mib": 2408.814453125,
+   "peak_reserved_mib": 2634.0,
+   "i": 1,
+   "t": 20.62
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.66757232099917,
+   "prompt_n": 1036,
+   "prompt_tps": 671.7680403112697,
+   "gen_n": 128,
+   "gen_tps": 60.24679363717957,
+   "i": 4,
+   "t": 24.053
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 2.048078551000799,
+   "prompt_n": 295,
+   "gen_n": 42,
+   "i": 5,
+   "t": 26.102
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 0.9539990179982851,
+   "prompt_n": 11,
+   "prompt_tps": 102.37033865969308,
+   "gen_n": 46,
+   "gen_tps": 53.70620557303327,
+   "i": 6,
+   "t": 27.056
+  },
+  {
+   "event": "synth",
+   "ok": true,
+   "id": 2,
+   "wall": 1.0481073970004218,
+   "audio_seconds": 10.52,
+   "rtf": 0.09962998070346214,
+   "stages_ms": {
+    "tokenize_text": 0.7619449970661663,
+    "prepare_reference": 1.1630709996097721,
+    "predict_duration": 29.92198699939763,
+    "sample_rf": 899.622561999422,
+    "unpatchify_latent": 0.05059500108473003,
+    "decode_latent": 115.06344699591864
+   },
+   "peak_alloc_mib": 2499.68310546875,
+   "peak_reserved_mib": 2816.0,
+   "i": 2,
+   "t": 28.989
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.8188050120006665,
+   "prompt_n": 1036,
+   "prompt_tps": 613.4453482960313,
+   "gen_n": 128,
+   "gen_tps": 60.308189092290526,
+   "i": 7,
+   "t": 30.874
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 2.246250219999638,
+   "prompt_n": 295,
+   "gen_n": 45,
+   "i": 8,
+   "t": 33.121
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.1604937320007593,
+   "prompt_n": 11,
+   "prompt_tps": 103.99236128837083,
+   "gen_n": 37,
+   "gen_tps": 35.1493848857645,
+   "i": 9,
+   "t": 34.281
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.271152761997655,
+   "prompt_n": 1036,
+   "prompt_tps": 726.6111515173618,
+   "gen_n": 104,
+   "gen_tps": 55.89356996029928,
+   "i": 10,
+   "t": 37.553
+  },
+  {
+   "event": "synth",
+   "ok": true,
+   "id": 3,
+   "wall": 0.9874894940003287,
+   "audio_seconds": 11.76,
+   "rtf": 0.08397019506805517,
+   "stages_ms": {
+    "tokenize_text": 0.7693389998166822,
+    "prepare_reference": 1.3535580001189373,
+    "predict_duration": 37.88422199431807,
+    "sample_rf": 818.9420580019942,
+    "unpatchify_latent": 0.03344300057506189,
+    "decode_latent": 123.78399099543458
+   },
+   "peak_alloc_mib": 2521.78759765625,
+   "peak_reserved_mib": 2910.0,
+   "i": 3,
+   "t": 40.498
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 3.0087333519986714,
+   "prompt_n": 295,
+   "gen_n": 52,
+   "i": 11,
+   "t": 40.561
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.9818556269965484,
+   "prompt_n": 11,
+   "prompt_tps": 105.4973721563663,
+   "gen_n": 128,
+   "gen_tps": 67.76513777132735,
+   "i": 12,
+   "t": 42.543
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.232081645997823,
+   "prompt_n": 1036,
+   "prompt_tps": 718.1542603669658,
+   "gen_n": 100,
+   "gen_tps": 55.44140599405601,
+   "i": 13,
+   "t": 45.775
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 1.9284255940001458,
+   "prompt_n": 295,
+   "gen_n": 38,
+   "i": 14,
+   "t": 47.704
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.995813998997619,
+   "prompt_n": 11,
+   "prompt_tps": 103.3863736759495,
+   "gen_n": 128,
+   "gen_tps": 67.64429540210539,
+   "i": 15,
+   "t": 49.7
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.2996261340013007,
+   "prompt_n": 1036,
+   "prompt_tps": 724.0314855854137,
+   "gen_n": 128,
+   "gen_tps": 68.37982353698136,
+   "i": 16,
+   "t": 52.999
+  },
+  {
+   "event": "synth",
+   "ok": true,
+   "id": 4,
+   "wall": 1.3580124389991397,
+   "audio_seconds": 17.8,
+   "rtf": 0.07629283365163705,
+   "stages_ms": {
+    "tokenize_text": 0.6663050007773563,
+    "prepare_reference": 0.9748650045366958,
+    "predict_duration": 29.032776001258753,
+    "sample_rf": 1031.4186889954726,
+    "unpatchify_latent": 0.01807400258257985,
+    "decode_latent": 293.27858200122137
+   },
+   "peak_alloc_mib": 2522.78564453125,
+   "peak_reserved_mib": 2910.0,
+   "i": 4,
+   "t": 53.617
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 2.193053108996537,
+   "prompt_n": 295,
+   "gen_n": 29,
+   "i": 17,
+   "t": 55.192
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.1203658059966983,
+   "prompt_n": 11,
+   "prompt_tps": 104.10554409342998,
+   "gen_n": 49,
+   "gen_tps": 47.39093174521055,
+   "i": 18,
+   "t": 56.313
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.5223612210029387,
+   "prompt_n": 1036,
+   "prompt_tps": 724.4968034026174,
+   "gen_n": 128,
+   "gen_tps": 60.92173140520051,
+   "i": 19,
+   "t": 59.835
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 2.0086785919993417,
+   "prompt_n": 295,
+   "gen_n": 39,
+   "i": 20,
+   "t": 61.844
+  },
+  {
+   "event": "vlm_text",
+   "ok": false,
+   "wall": 0.811976222001249,
+   "error": "HTTP Error 500: Internal Server Error",
+   "i": 21,
+   "t": 62.656
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.3334336609987076,
+   "prompt_n": 1036,
+   "prompt_tps": 723.9267576187002,
+   "gen_n": 128,
+   "gen_tps": 66.88949118691451,
+   "i": 22,
+   "t": 65.99
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 2.578954578995763,
+   "prompt_n": 295,
+   "gen_n": 54,
+   "i": 23,
+   "t": 68.569
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.5325004499973147,
+   "prompt_n": 11,
+   "prompt_tps": 103.06766860933605,
+   "gen_n": 128,
+   "gen_tps": 89.5347296051166,
+   "i": 24,
+   "t": 70.101
+  },
+  {
+   "event": "synth",
+   "ok": true,
+   "id": 5,
+   "wall": 0.7054427609982667,
+   "audio_seconds": 6.48,
+   "rtf": 0.10886462361084363,
+   "stages_ms": {
+    "tokenize_text": 0.8661809988552704,
+    "prepare_reference": 2.8158019995316863,
+    "predict_duration": 33.2374819990946,
+    "sample_rf": 586.7956519941799,
+    "unpatchify_latent": 0.021911000658292323,
+    "decode_latent": 72.32320599723607
+   },
+   "peak_alloc_mib": 2522.78564453125,
+   "peak_reserved_mib": 2952.0,
+   "i": 5,
+   "t": 72.131
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 4.2242057170005864,
+   "prompt_n": 1036,
+   "prompt_tps": 718.6992930246626,
+   "gen_n": 123,
+   "gen_tps": 43.94879173243976,
+   "i": 25,
+   "t": 74.326
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 2.105521826997574,
+   "prompt_n": 295,
+   "gen_n": 33,
+   "i": 26,
+   "t": 76.431
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.2887722570012556,
+   "prompt_n": 11,
+   "prompt_tps": 103.07636084222759,
+   "gen_n": 65,
+   "gen_tps": 54.59348750875415,
+   "i": 27,
+   "t": 77.72
+  },
+  {
+   "event": "synth",
+   "ok": true,
+   "id": 6,
+   "wall": 0.8098979689966654,
+   "audio_seconds": 7.32,
+   "rtf": 0.1106417990432603,
+   "stages_ms": {
+    "tokenize_text": 0.9398800029885024,
+    "prepare_reference": 1.2178239994682372,
+    "predict_duration": 36.61910999653628,
+    "sample_rf": 689.119226000912,
+    "unpatchify_latent": 0.15242699737427756,
+    "decode_latent": 79.87591799610527
+   },
+   "peak_alloc_mib": 2522.78564453125,
+   "peak_reserved_mib": 2956.0,
+   "i": 6,
+   "t": 79.422
+  },
+  {
+   "event": "vlm_text",
+   "ok": false,
+   "wall": 4.342866922997928,
+   "error": "HTTP Error 500: Internal Server Error",
+   "i": 28,
+   "t": 82.063
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 1.8519821199952275,
+   "prompt_n": 295,
+   "gen_n": 26,
+   "i": 29,
+   "t": 83.915
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.4421532769993064,
+   "prompt_n": 11,
+   "prompt_tps": 102.75476174907286,
+   "gen_n": 60,
+   "gen_tps": 44.55708744668253,
+   "i": 30,
+   "t": 85.357
+  },
+  {
+   "event": "synth",
+   "ok": true,
+   "id": 7,
+   "wall": 2.111120748995745,
+   "audio_seconds": 10.52,
+   "rtf": 0.20067687728096437,
+   "stages_ms": {
+    "tokenize_text": 0.5888490049983375,
+    "prepare_reference": 1.1866440036101267,
+    "predict_duration": 43.30276399559807,
+    "sample_rf": 1948.5484729957534,
+    "unpatchify_latent": 0.09308500011684373,
+    "decode_latent": 115.95738500182051
+   },
+   "peak_alloc_mib": 2572.68310546875,
+   "peak_reserved_mib": 3000.0,
+   "i": 7,
+   "t": 88.854
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.905075188995397,
+   "prompt_n": 1036,
+   "prompt_tps": 722.5418408218006,
+   "gen_n": 128,
+   "gen_tps": 51.61141400644371,
+   "i": 31,
+   "t": 89.262
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 2.3174387639955967,
+   "prompt_n": 295,
+   "gen_n": 43,
+   "i": 32,
+   "t": 91.58
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.4902563599971472,
+   "prompt_n": 11,
+   "prompt_tps": 104.92779060228551,
+   "gen_n": 52,
+   "gen_tps": 36.865426735385746,
+   "i": 33,
+   "t": 93.07
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.89892511999642,
+   "prompt_n": 1036,
+   "prompt_tps": 728.147321914915,
+   "gen_n": 128,
+   "gen_tps": 51.33781494941002,
+   "i": 34,
+   "t": 96.969
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 2.0988041190066724,
+   "prompt_n": 295,
+   "gen_n": 45,
+   "i": 35,
+   "t": 99.068
+  },
+  {
+   "event": "synth",
+   "ok": true,
+   "id": 8,
+   "wall": 0.9888184169976739,
+   "audio_seconds": 11.76,
+   "rtf": 0.084083198724292,
+   "stages_ms": {
+    "tokenize_text": 0.6614250014536083,
+    "prepare_reference": 1.187396002933383,
+    "predict_duration": 33.86802000022726,
+    "sample_rf": 822.2184670012211,
+    "unpatchify_latent": 0.02266199589939788,
+    "decode_latent": 129.0504169955966
+   },
+   "peak_alloc_mib": 2594.78759765625,
+   "peak_reserved_mib": 3070.0,
+   "i": 8,
+   "t": 100.364
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.8193198500011931,
+   "prompt_n": 11,
+   "prompt_tps": 105.17660107471363,
+   "gen_n": 40,
+   "gen_tps": 22.80304368010721,
+   "i": 36,
+   "t": 100.887
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.577839119003329,
+   "prompt_n": 1036,
+   "prompt_tps": 727.1961534411961,
+   "gen_n": 128,
+   "gen_tps": 59.048894344324786,
+   "i": 37,
+   "t": 104.465
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 1.8997407339993515,
+   "prompt_n": 295,
+   "gen_n": 27,
+   "i": 38,
+   "t": 106.365
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.8720401370010222,
+   "prompt_n": 11,
+   "prompt_tps": 103.96680623422776,
+   "gen_n": 79,
+   "gen_tps": 44.41493571792188,
+   "i": 39,
+   "t": 108.237
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 2.8704231820011046,
+   "prompt_n": 1036,
+   "prompt_tps": 727.042543919054,
+   "gen_n": 128,
+   "gen_tps": 88.15434646046415,
+   "i": 40,
+   "t": 111.108
+  },
+  {
+   "event": "synth",
+   "ok": true,
+   "id": 9,
+   "wall": 1.3053065200001583,
+   "audio_seconds": 17.8,
+   "rtf": 0.07333182696630103,
+   "stages_ms": {
+    "tokenize_text": 0.6700119993183762,
+    "prepare_reference": 1.1526099988259375,
+    "predict_duration": 27.482496996526606,
+    "sample_rf": 1022.9430499966838,
+    "unpatchify_latent": 0.015299003280233592,
+    "decode_latent": 251.67517700174358
+   },
+   "peak_alloc_mib": 2594.78759765625,
+   "peak_reserved_mib": 3072.0,
+   "i": 9,
+   "t": 113.43
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 2.5863693700011936,
+   "prompt_n": 295,
+   "gen_n": 27,
+   "i": 41,
+   "t": 113.694
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.1296870470032445,
+   "prompt_n": 11,
+   "prompt_tps": 101.83959338227805,
+   "gen_n": 58,
+   "gen_tps": 56.48088419337865,
+   "i": 42,
+   "t": 114.824
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.2219446289964253,
+   "prompt_n": 1036,
+   "prompt_tps": 724.7933184690071,
+   "gen_n": 128,
+   "gen_tps": 71.04759965404854,
+   "i": 43,
+   "t": 118.046
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 1.7346497160033323,
+   "prompt_n": 295,
+   "gen_n": 29,
+   "i": 44,
+   "t": 119.78
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.662903414995526,
+   "prompt_n": 11,
+   "prompt_tps": 97.24358634346436,
+   "gen_n": 70,
+   "gen_tps": 44.664530536945335,
+   "i": 45,
+   "t": 121.443
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.9491035000028205,
+   "prompt_n": 1036,
+   "prompt_tps": 724.1661080475405,
+   "gen_n": 128,
+   "gen_tps": 50.7006267715278,
+   "i": 46,
+   "t": 125.393
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 1.827854680006567,
+   "prompt_n": 295,
+   "gen_n": 31,
+   "i": 47,
+   "t": 127.22
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.716833589001908,
+   "prompt_n": 11,
+   "prompt_tps": 104.19922892570597,
+   "gen_n": 73,
+   "gen_tps": 44.74381370167435,
+   "i": 48,
+   "t": 128.937
+  },
+  {
+   "event": "synth",
+   "ok": true,
+   "id": 10,
+   "wall": 0.7279976400022861,
+   "audio_seconds": 6.48,
+   "rtf": 0.11234531481516759,
+   "stages_ms": {
+    "tokenize_text": 1.0983780011883937,
+    "prepare_reference": 1.9926009990740567,
+    "predict_duration": 37.06647299986798,
+    "sample_rf": 618.0522939976072,
+    "unpatchify_latent": 0.031479001336265355,
+    "decode_latent": 65.39756699930876
+   },
+   "peak_alloc_mib": 2594.78759765625,
+   "peak_reserved_mib": 3072.0,
+   "i": 10,
+   "t": 131.96
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.9972622669956763,
+   "prompt_n": 1036,
+   "prompt_tps": 722.1822171691155,
+   "gen_n": 128,
+   "gen_tps": 49.60276775632621,
+   "i": 49,
+   "t": 132.935
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 1.9259904089994961,
+   "prompt_n": 295,
+   "gen_n": 28,
+   "i": 50,
+   "t": 134.861
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.9365424869974959,
+   "prompt_n": 11,
+   "prompt_tps": 103.78729266129488,
+   "gen_n": 128,
+   "gen_tps": 69.77301245805378,
+   "i": 51,
+   "t": 136.797
+  },
+  {
+   "event": "synth",
+   "ok": true,
+   "id": 11,
+   "wall": 0.748526753995975,
+   "audio_seconds": 7.32,
+   "rtf": 0.10225775327813866,
+   "stages_ms": {
+    "tokenize_text": 0.6875149992993101,
+    "prepare_reference": 1.8377809974481352,
+    "predict_duration": 36.86860000016168,
+    "sample_rf": 610.9666929987725,
+    "unpatchify_latent": 0.02101000427501276,
+    "decode_latent": 96.26881400618004
+   },
+   "peak_alloc_mib": 2594.78759765625,
+   "peak_reserved_mib": 3072.0,
+   "i": 11,
+   "t": 139.197
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 4.19187671400141,
+   "prompt_n": 1036,
+   "prompt_tps": 725.9614609764182,
+   "gen_n": 128,
+   "gen_tps": 46.09440642563284,
+   "i": 52,
+   "t": 140.989
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 1.7554643270050292,
+   "prompt_n": 295,
+   "gen_n": 27,
+   "i": 53,
+   "t": 142.745
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 1.389481681995676,
+   "prompt_n": 11,
+   "prompt_tps": 101.53033911133264,
+   "gen_n": 59,
+   "gen_tps": 45.43385809439433,
+   "i": 54,
+   "t": 144.134
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.2621378379990347,
+   "prompt_n": 1036,
+   "prompt_tps": 725.5013732704565,
+   "gen_n": 128,
+   "gen_tps": 69.42459040858284,
+   "i": 55,
+   "t": 147.396
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 12,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 46.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 723.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.23 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.62 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 355.52 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.9239866249990882,
+   "i": 12,
+   "t": 147.443
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 13,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 693.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.60 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 401.30 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 1.016054248000728,
+   "i": 13,
+   "t": 148.46
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 14,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 693.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.60 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 401.24 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 1.0219544979991042,
+   "i": 14,
+   "t": 149.482
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 15,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 697.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.58 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 422.29 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6316428439968149,
+   "i": 15,
+   "t": 150.115
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 2.8127852870020433,
+   "prompt_n": 295,
+   "gen_n": 29,
+   "i": 56,
+   "t": 150.209
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 16,
+   "error": "RuntimeError: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript (most recent call last):\nRuntimeError: CUDA out of memory. Tried to allocate 80.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 757.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.20 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.49 GiB is allocated by PyTorch, with 165.91 MiB allocated in private pools (e.g., CUDA Graphs), and 447.27 MiB is reserved by PyTorch but unallocated. If reserved but unallocated mem",
+   "oom": true,
+   "wall": 0.6419271089980612,
+   "i": 16,
+   "t": 150.757
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 17,
+   "error": "RuntimeError: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript (most recent call last):\nRuntimeError: CUDA out of memory. Tried to allocate 80.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 705.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.25 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.51 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 477.00 MiB is reserved by PyTorch but unallocated. If reserved but unallocated mem",
+   "oom": true,
+   "wall": 0.8004753970017191,
+   "i": 17,
+   "t": 151.558
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 18,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 695.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.54 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 461.88 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.9031078240004717,
+   "i": 18,
+   "t": 152.462
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 19,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 695.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.54 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 461.82 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 1.0457981940053287,
+   "i": 19,
+   "t": 153.508
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.3649577970063547,
+   "prompt_n": 11,
+   "prompt_tps": 50.475386366139276,
+   "gen_n": 55,
+   "gen_tps": 17.228578894288948,
+   "i": 57,
+   "t": 153.574
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 20,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 683.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.54 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 468.63 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6269690629997058,
+   "i": 20,
+   "t": 154.136
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 21,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 703.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.25 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 165.91 MiB allocated in private pools (e.g., CUDA Graphs), and 472.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6142757940033334,
+   "i": 21,
+   "t": 154.751
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 22,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 705.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.25 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 468.60 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.8841882299966528,
+   "i": 22,
+   "t": 155.635
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 23,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 693.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 469.67 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.8612018189960509,
+   "i": 23,
+   "t": 156.497
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 24,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 693.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 469.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 1.021886511000048,
+   "i": 24,
+   "t": 157.519
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 25,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 701.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.25 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 465.54 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6253246880005463,
+   "i": 25,
+   "t": 158.145
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 26,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 701.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.25 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 165.91 MiB allocated in private pools (e.g., CUDA Graphs), and 474.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.615624152997043,
+   "i": 26,
+   "t": 158.761
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 27,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 701.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.25 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 472.60 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.7957991129951552,
+   "i": 27,
+   "t": 159.557
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 6.8285141450032825,
+   "prompt_n": 1036,
+   "prompt_tps": 587.0007660473317,
+   "gen_n": 128,
+   "gen_tps": 25.131868099249107,
+   "i": 58,
+   "t": 160.403
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 28,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 693.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 469.67 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.8588939039982506,
+   "i": 28,
+   "t": 160.417
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 29,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 693.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 469.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 1.1424258730039583,
+   "i": 29,
+   "t": 161.56
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 30,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 683.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.54 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 468.63 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.638042985003267,
+   "i": 30,
+   "t": 162.198
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 31,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 699.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 165.91 MiB allocated in private pools (e.g., CUDA Graphs), and 476.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6813073770026676,
+   "i": 31,
+   "t": 162.88
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 2.880330646999937,
+   "prompt_n": 295,
+   "gen_n": 26,
+   "i": 59,
+   "t": 163.283
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 32,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 697.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 476.60 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.8037029639963293,
+   "i": 32,
+   "t": 163.684
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 33,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 687.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 475.67 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.8659624330030056,
+   "i": 33,
+   "t": 164.551
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 34,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 687.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 475.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 1.0338731800002279,
+   "i": 34,
+   "t": 165.585
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 35,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 699.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 467.54 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6220206369980588,
+   "i": 35,
+   "t": 166.208
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 3.4201872080011526,
+   "prompt_n": 11,
+   "prompt_tps": 58.798060733051464,
+   "gen_n": 53,
+   "gen_tps": 16.133766297430945,
+   "i": 60,
+   "t": 166.703
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 36,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 701.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.25 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 165.91 MiB allocated in private pools (e.g., CUDA Graphs), and 474.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6188718780031195,
+   "i": 36,
+   "t": 166.827
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 37,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 697.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 476.60 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.7743817759983358,
+   "i": 37,
+   "t": 167.602
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 38,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 687.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 475.67 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.954000357996847,
+   "i": 38,
+   "t": 168.557
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 39,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 687.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 475.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 1.0392435809990275,
+   "i": 39,
+   "t": 169.596
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 40,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 697.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 469.54 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6142534120008349,
+   "i": 40,
+   "t": 170.211
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 41,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 699.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 165.91 MiB allocated in private pools (e.g., CUDA Graphs), and 476.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6867308389992104,
+   "i": 41,
+   "t": 170.898
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 42,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 695.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 478.60 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.8291714490042068,
+   "i": 42,
+   "t": 171.728
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 43,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 683.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 479.67 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.8869713399981265,
+   "i": 43,
+   "t": 172.615
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 44,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 683.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 479.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 1.03245077199972,
+   "i": 44,
+   "t": 173.648
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 45,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 699.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 467.54 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6275566900003469,
+   "i": 45,
+   "t": 174.277
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 46,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 703.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.25 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 165.91 MiB allocated in private pools (e.g., CUDA Graphs), and 472.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6360587290037074,
+   "i": 46,
+   "t": 174.913
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 47,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 699.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 474.60 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.7997137940037646,
+   "i": 47,
+   "t": 175.713
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 9.54231439299474,
+   "prompt_n": 1036,
+   "prompt_tps": 568.8341480583044,
+   "gen_n": 128,
+   "gen_tps": 16.453931582738658,
+   "i": 61,
+   "t": 176.246
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 48,
+   "error": "RuntimeError: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript (most recent call last):\nRuntimeError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 699.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.51 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 485.33 MiB is reserved by PyTorch but unallocated. If reserved but unallocated mem",
+   "oom": true,
+   "wall": 0.981390671004192,
+   "i": 48,
+   "t": 176.695
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 49,
+   "error": "RuntimeError: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript (most recent call last):\nRuntimeError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 699.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.51 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 485.27 MiB is reserved by PyTorch but unallocated. If reserved but unallocated mem",
+   "oom": true,
+   "wall": 0.9666443250025623,
+   "i": 49,
+   "t": 177.662
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 50,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 699.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 467.54 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6127073310053675,
+   "i": 50,
+   "t": 178.276
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 51,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 701.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.25 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 165.91 MiB allocated in private pools (e.g., CUDA Graphs), and 474.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6243021519985632,
+   "i": 51,
+   "t": 178.901
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 52,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 697.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 476.60 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.8388285420005559,
+   "i": 52,
+   "t": 179.74
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 3.5552736009994987,
+   "prompt_n": 295,
+   "gen_n": 30,
+   "i": 62,
+   "t": 179.801
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 53,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 683.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 479.67 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.9041283339975053,
+   "i": 53,
+   "t": 180.645
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 54,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 683.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 479.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 1.0508869049954228,
+   "i": 54,
+   "t": 181.696
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 55,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 699.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 467.54 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6415639539991389,
+   "i": 55,
+   "t": 182.338
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 56,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 703.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.25 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 165.91 MiB allocated in private pools (e.g., CUDA Graphs), and 472.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6147691630030749,
+   "i": 56,
+   "t": 182.953
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 57,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 693.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 480.60 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.8084106189999147,
+   "i": 57,
+   "t": 183.762
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 58,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 687.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 475.67 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.857323346004705,
+   "i": 58,
+   "t": 184.62
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 5.011405678997107,
+   "prompt_n": 11,
+   "prompt_tps": 70.78142695356739,
+   "gen_n": 128,
+   "gen_tps": 26.18065476374536,
+   "i": 63,
+   "t": 184.813
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 59,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 687.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 475.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.9524201329986681,
+   "i": 59,
+   "t": 185.573
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 60,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 697.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 469.54 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6568377430012333,
+   "i": 60,
+   "t": 186.23
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 61,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 699.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 165.91 MiB allocated in private pools (e.g., CUDA Graphs), and 476.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6162970700024744,
+   "i": 61,
+   "t": 186.847
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 62,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 693.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 480.60 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.8004896150014247,
+   "i": 62,
+   "t": 187.648
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 63,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 687.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 475.67 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.9124130639975192,
+   "i": 63,
+   "t": 188.561
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 64,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 687.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 475.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 1.0614350060059223,
+   "i": 64,
+   "t": 189.623
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 65,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 695.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 471.54 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6821683180023683,
+   "i": 65,
+   "t": 190.306
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 66,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 695.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 165.91 MiB allocated in private pools (e.g., CUDA Graphs), and 480.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.6740802290005377,
+   "i": 66,
+   "t": 190.98
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 67,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 40.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 691.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.26 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.52 GiB is allocated by PyTorch, with 167.92 MiB allocated in private pools (e.g., CUDA Graphs), and 482.60 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.8304940200032433,
+   "i": 67,
+   "t": 191.811
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 68,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 687.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 475.67 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 0.8818084079975961,
+   "i": 68,
+   "t": 192.694
+  },
+  {
+   "event": "vlm_text",
+   "ok": true,
+   "wall": 8.134561789003783,
+   "prompt_n": 1036,
+   "prompt_tps": 587.8227634932559,
+   "gen_n": 128,
+   "gen_tps": 19.93888652779677,
+   "i": 64,
+   "t": 192.947
+  },
+  {
+   "event": "synth",
+   "ok": false,
+   "id": 69,
+   "error": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 15.52 GiB of which 687.31 MiB is free. Process 107839 has 11.55 GiB memory in use. Including non-PyTorch memory, this process has 3.27 GiB memory in use. 3.00 GiB allowed; Of the allocated memory 2.53 GiB is allocated by PyTorch, with 189.90 MiB allocated in private pools (e.g., CUDA Graphs), and 475.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory ",
+   "oom": true,
+   "wall": 1.1470796249996056,
+   "i": 69,
+   "t": 193.842
+  },
+  {
+   "event": "vlm_image",
+   "ok": true,
+   "wall": 2.7807454689973383,
+   "prompt_n": 295,
+   "gen_n": 45,
+   "i": 65,
+   "t": 195.728
+  },
+  {
+   "event": "stats",
+   "ok": true,
+   "alloc_mib": 2255.2685546875,
+   "reserved_mib": 3068.0,
+   "peak_alloc_mib": 2594.78759765625,
+   "peak_reserved_mib": 3072.0,
+   "t": 195.729
+  },
+  {
+   "event": "tts_unload",
+   "ok": true,
+   "wall": 4.625287139999273,
+   "rc": 0,
+   "t": 200.362
+  }
+ ],
+ "gpu_timeline": [
+  [
+   0.02,
+   0,
+   11611
+  ],
+  [
+   1.03,
+   0,
+   11615
+  ],
+  [
+   2.03,
+   0,
+   11615
+  ],
+  [
+   3.03,
+   0,
+   11615
+  ],
+  [
+   4.03,
+   0,
+   11615
+  ],
+  [
+   5.03,
+   0,
+   11615
+  ],
+  [
+   6.03,
+   0,
+   11615
+  ],
+  [
+   7.03,
+   0,
+   11970
+  ],
+  [
+   8.03,
+   26,
+   12796
+  ],
+  [
+   9.04,
+   0,
+   13222
+  ],
+  [
+   10.04,
+   0,
+   13222
+  ],
+  [
+   11.04,
+   0,
+   13832
+  ],
+  [
+   12.04,
+   62,
+   14240
+  ],
+  [
+   13.04,
+   0,
+   14386
+  ],
+  [
+   14.04,
+   29,
+   14386
+  ],
+  [
+   15.05,
+   30,
+   14476
+  ],
+  [
+   16.05,
+   97,
+   14476
+  ],
+  [
+   17.05,
+   8,
+   14570
+  ],
+  [
+   18.05,
+   95,
+   14572
+  ],
+  [
+   19.05,
+   32,
+   14574
+  ],
+  [
+   20.05,
+   32,
+   14234
+  ],
+  [
+   21.06,
+   99,
+   14702
+  ],
+  [
+   22.06,
+   98,
+   14702
+  ],
+  [
+   23.06,
+   30,
+   14702
+  ],
+  [
+   24.06,
+   32,
+   14702
+  ],
+  [
+   25.06,
+   96,
+   14740
+  ],
+  [
+   26.06,
+   21,
+   14744
+  ],
+  [
+   27.07,
+   30,
+   14744
+  ],
+  [
+   28.07,
+   97,
+   14812
+  ],
+  [
+   29.07,
+   95,
+   14938
+  ],
+  [
+   30.07,
+   21,
+   14938
+  ],
+  [
+   31.07,
+   31,
+   14938
+  ],
+  [
+   32.08,
+   95,
+   14938
+  ],
+  [
+   33.08,
+   32,
+   14938
+  ],
+  [
+   34.08,
+   35,
+   14938
+  ],
+  [
+   35.08,
+   98,
+   14938
+  ],
+  [
+   36.08,
+   16,
+   14938
+  ],
+  [
+   37.08,
+   31,
+   14938
+  ],
+  [
+   38.09,
+   13,
+   14938
+  ],
+  [
+   39.09,
+   96,
+   14938
+  ],
+  [
+   40.09,
+   74,
+   14558
+  ],
+  [
+   41.09,
+   15,
+   15036
+  ],
+  [
+   42.09,
+   32,
+   15036
+  ],
+  [
+   43.09,
+   17,
+   15036
+  ],
+  [
+   44.1,
+   98,
+   15036
+  ],
+  [
+   45.1,
+   31,
+   15036
+  ],
+  [
+   46.1,
+   31,
+   15036
+  ],
+  [
+   47.1,
+   95,
+   15036
+  ],
+  [
+   48.1,
+   30,
+   15036
+  ],
+  [
+   49.11,
+   30,
+   15036
+  ],
+  [
+   50.11,
+   30,
+   15036
+  ],
+  [
+   51.11,
+   97,
+   15036
+  ],
+  [
+   52.11,
+   40,
+   15036
+  ],
+  [
+   53.11,
+   100,
+   15036
+  ],
+  [
+   54.11,
+   100,
+   15036
+  ],
+  [
+   55.12,
+   32,
+   15036
+  ],
+  [
+   56.12,
+   30,
+   15036
+  ],
+  [
+   57.12,
+   99,
+   15036
+  ],
+  [
+   58.12,
+   35,
+   15036
+  ],
+  [
+   59.12,
+   29,
+   15036
+  ],
+  [
+   60.12,
+   32,
+   15036
+  ],
+  [
+   61.13,
+   96,
+   15036
+  ],
+  [
+   62.13,
+   30,
+   15036
+  ],
+  [
+   63.13,
+   29,
+   15036
+  ],
+  [
+   64.13,
+   98,
+   15036
+  ],
+  [
+   65.13,
+   31,
+   15036
+  ],
+  [
+   66.13,
+   34,
+   15036
+  ],
+  [
+   67.14,
+   95,
+   15036
+  ],
+  [
+   68.14,
+   30,
+   15042
+  ],
+  [
+   69.14,
+   18,
+   15042
+  ],
+  [
+   70.14,
+   31,
+   15042
+  ],
+  [
+   71.14,
+   98,
+   15042
+  ],
+  [
+   72.14,
+   72,
+   15044
+  ],
+  [
+   73.15,
+   31,
+   15044
+  ],
+  [
+   74.15,
+   29,
+   15044
+  ],
+  [
+   75.15,
+   100,
+   15044
+  ],
+  [
+   76.15,
+   19,
+   15044
+  ],
+  [
+   77.15,
+   28,
+   15044
+  ],
+  [
+   78.16,
+   26,
+   15044
+  ],
+  [
+   79.16,
+   97,
+   14656
+  ],
+  [
+   80.16,
+   31,
+   15066
+  ],
+  [
+   81.16,
+   28,
+   15066
+  ],
+  [
+   82.16,
+   29,
+   15066
+  ],
+  [
+   83.16,
+   96,
+   15066
+  ],
+  [
+   84.17,
+   29,
+   15066
+  ],
+  [
+   85.17,
+   34,
+   15066
+  ],
+  [
+   86.17,
+   98,
+   15066
+  ],
+  [
+   87.17,
+   85,
+   15066
+  ],
+  [
+   88.17,
+   27,
+   14698
+  ],
+  [
+   89.18,
+   77,
+   15124
+  ],
+  [
+   90.18,
+   60,
+   15124
+  ],
+  [
+   91.18,
+   33,
+   15124
+  ],
+  [
+   92.18,
+   26,
+   15124
+  ],
+  [
+   93.18,
+   29,
+   15124
+  ],
+  [
+   94.18,
+   97,
+   15124
+  ],
+  [
+   95.18,
+   31,
+   15124
+  ],
+  [
+   96.19,
+   32,
+   15124
+  ],
+  [
+   97.19,
+   68,
+   15124
+  ],
+  [
+   98.19,
+   68,
+   15124
+  ],
+  [
+   99.19,
+   16,
+   15124
+  ],
+  [
+   100.19,
+   91,
+   14758
+  ],
+  [
+   101.2,
+   97,
+   15202
+  ],
+  [
+   102.2,
+   100,
+   15202
+  ],
+  [
+   103.2,
+   31,
+   15202
+  ],
+  [
+   104.2,
+   32,
+   15202
+  ],
+  [
+   105.2,
+   95,
+   15202
+  ],
+  [
+   106.2,
+   33,
+   15202
+  ],
+  [
+   107.21,
+   30,
+   15202
+  ],
+  [
+   108.21,
+   28,
+   15202
+  ],
+  [
+   109.21,
+   97,
+   15202
+  ],
+  [
+   110.21,
+   37,
+   15202
+  ],
+  [
+   111.21,
+   32,
+   15202
+  ],
+  [
+   112.21,
+   96,
+   15204
+  ],
+  [
+   113.22,
+   83,
+   15204
+  ],
+  [
+   114.22,
+   30,
+   15202
+  ],
+  [
+   115.22,
+   98,
+   15202
+  ],
+  [
+   116.22,
+   49,
+   15202
+  ],
+  [
+   117.22,
+   31,
+   15202
+  ],
+  [
+   118.22,
+   11,
+   15202
+  ],
+  [
+   119.23,
+   97,
+   15202
+  ],
+  [
+   120.23,
+   30,
+   15202
+  ],
+  [
+   121.23,
+   29,
+   15202
+  ],
+  [
+   122.23,
+   96,
+   15202
+  ],
+  [
+   123.23,
+   31,
+   15202
+  ],
+  [
+   124.23,
+   31,
+   15202
+  ],
+  [
+   125.24,
+   31,
+   15202
+  ],
+  [
+   126.24,
+   95,
+   15202
+  ],
+  [
+   127.24,
+   34,
+   15202
+  ],
+  [
+   128.24,
+   30,
+   15202
+  ],
+  [
+   129.24,
+   78,
+   15202
+  ],
+  [
+   130.24,
+   98,
+   15202
+  ],
+  [
+   131.25,
+   31,
+   15202
+  ],
+  [
+   132.25,
+   32,
+   15196
+  ],
+  [
+   133.25,
+   96,
+   15196
+  ],
+  [
+   134.25,
+   41,
+   15196
+  ],
+  [
+   135.25,
+   28,
+   15196
+  ],
+  [
+   136.25,
+   31,
+   15196
+  ],
+  [
+   137.26,
+   98,
+   15196
+  ],
+  [
+   138.26,
+   24,
+   15196
+  ],
+  [
+   139.26,
+   100,
+   15178
+  ],
+  [
+   140.26,
+   31,
+   15178
+  ],
+  [
+   141.27,
+   47,
+   15178
+  ],
+  [
+   142.27,
+   88,
+   15178
+  ],
+  [
+   143.27,
+   24,
+   15178
+  ],
+  [
+   144.27,
+   30,
+   15178
+  ],
+  [
+   145.27,
+   98,
+   15178
+  ],
+  [
+   146.27,
+   41,
+   15178
+  ],
+  [
+   147.28,
+   70,
+   14868
+  ],
+  [
+   148.28,
+   100,
+   14934
+  ],
+  [
+   149.28,
+   100,
+   15200
+  ],
+  [
+   150.28,
+   98,
+   15008
+  ],
+  [
+   151.28,
+   100,
+   15050
+  ],
+  [
+   152.28,
+   100,
+   15090
+  ],
+  [
+   153.29,
+   100,
+   15196
+  ],
+  [
+   154.29,
+   100,
+   15098
+  ],
+  [
+   155.29,
+   100,
+   15096
+  ],
+  [
+   156.29,
+   100,
+   15112
+  ],
+  [
+   157.29,
+   100,
+   15198
+  ],
+  [
+   158.29,
+   97,
+   15098
+  ],
+  [
+   159.3,
+   100,
+   15096
+  ],
+  [
+   160.3,
+   100,
+   15112
+  ],
+  [
+   161.3,
+   100,
+   15198
+  ],
+  [
+   162.3,
+   54,
+   15132
+  ],
+  [
+   163.3,
+   83,
+   15096
+  ],
+  [
+   164.31,
+   100,
+   15110
+  ],
+  [
+   165.31,
+   100,
+   15202
+  ],
+  [
+   166.31,
+   71,
+   15114
+  ],
+  [
+   167.31,
+   100,
+   15096
+  ],
+  [
+   168.31,
+   100,
+   15116
+  ],
+  [
+   169.31,
+   100,
+   15202
+  ],
+  [
+   170.31,
+   74,
+   15132
+  ],
+  [
+   171.32,
+   66,
+   15096
+  ],
+  [
+   172.32,
+   100,
+   15116
+  ],
+  [
+   173.32,
+   100,
+   15206
+  ],
+  [
+   174.32,
+   96,
+   15190
+  ],
+  [
+   175.32,
+   79,
+   15096
+  ],
+  [
+   176.32,
+   100,
+   15116
+  ],
+  [
+   177.33,
+   100,
+   15190
+  ],
+  [
+   178.33,
+   89,
+   15190
+  ],
+  [
+   179.33,
+   65,
+   15096
+  ],
+  [
+   180.33,
+   100,
+   15116
+  ],
+  [
+   181.33,
+   100,
+   15206
+  ],
+  [
+   182.33,
+   100,
+   15188
+  ],
+  [
+   183.33,
+   69,
+   15096
+  ],
+  [
+   184.34,
+   100,
+   15116
+  ],
+  [
+   185.34,
+   100,
+   15202
+  ],
+  [
+   186.34,
+   99,
+   15132
+  ],
+  [
+   187.34,
+   100,
+   15096
+  ],
+  [
+   188.34,
+   100,
+   15112
+  ],
+  [
+   189.35,
+   100,
+   15202
+  ],
+  [
+   190.35,
+   98,
+   15194
+  ],
+  [
+   191.35,
+   75,
+   15096
+  ],
+  [
+   192.35,
+   100,
+   15116
+  ],
+  [
+   193.35,
+   100,
+   15202
+  ],
+  [
+   194.35,
+   95,
+   15202
+  ],
+  [
+   195.35,
+   29,
+   15202
+  ],
+  [
+   196.36,
+   0,
+   15202
+  ],
+  [
+   197.36,
+   0,
+   15202
+  ],
+  [
+   198.36,
+   0,
+   15202
+  ],
+  [
+   199.36,
+   0,
+   15202
+  ],
+  [
+   200.36,
+   0,
+   11851
+  ]
+ ],
+ "tag": "10_concurrent_ncmoe12",
+ "args": {
+  "scenario": "concurrent",
+  "duration": 180.0,
+  "vlm_url": "http://127.0.0.1:8080",
+  "vlm_model": "gemma4-26b-a4b",
+  "vlm_n_predict": 128,
+  "vlm_gap": 0.0,
+  "image": "/home/mh/dev/Irodori-TTS/bench/assets/coexist_image.png",
+  "ref": null,
+  "playback": true,
+  "churn_synths": 3,
+  "swap_gap": 5.0,
+  "sample_ms": 100,
+  "env": [],
+  "tag": "10_concurrent_ncmoe12",
+  "output": "/tmp/claude-1000/-home-mh-dev-Irodori-TTS/7d5f050a-0c9c-41c2-a37e-f819f02ba545/scratchpad/coexist/concurrent12.json"
+ },
+ "gpu_timeline_note": "downsampled to ~1 Hz"
+}

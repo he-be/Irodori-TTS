@@ -68,6 +68,9 @@ uv run --no-sync python bench/bench_runtime.py \
 | `check_codec_encode_chunk.py` | 参照 encode の chunk 化の一致確認と時間・VRAM（09） |
 | `gen_quality_wavs.py` | 品質比較用 wav セット生成（watermark なし） |
 | `audio_metrics.py` | 2 つの wav の max abs / SNR / log-mel LSD / 長さ差 |
+| `coexist_stress.py` | llama-swap の VLM と TTS の同居 stress（同時実行 / ロード churn / パイプライン、10） |
+| `coexist_tts_worker.py` | 同居 stress の TTS 側ワーカー（別プロセス = 本物の load/unload） |
+| `coexist_llama_swap.sh` | `config.yaml` を変更せず `--n-cpu-moe` を注入して llama-swap を起動（10） |
 
 最適化スイッチは `irodori_tts/opt_config.py` の `IRODORI_OPT_*` 環境変数（既定は全部 on、watermark は off）。
 
@@ -81,15 +84,29 @@ uv run --no-sync python bench/bench_runtime.py \
   max abs diff ≤ 1e-3**。BF16 では 40 step の Euler 積分がこの誤差をカオス的に増幅するので、
   BF16 同士の bit 比較はしない（02 参照）。
 
-## 現在の既定（09 時点）
+## 現在の既定（10 時点）
 
 `infer.py` / Gradio とも bf16 が既定。`IRODORI_OPT_*` は全部 on（watermark off、codec 重み fp32 +
 decode のみ bf16 autocast、decode chunk 96/16、参照 encode chunk 96/32、CUDA Graph は
 entry 6 / static 予算 256 MB / entry ごと pool / latent 384 frame 超は eager、
-**VRAM 上限 3072 MB**）。DiT compile は常駐プロセス向けに
+**VRAM 上限 3840 MB**）。DiT compile は常駐プロセス向けに
 `IRODORI_OPT_COMPILE_DIT=1`（初回 45〜80 s、07 参照）。
 FP32 で動かすときは `IRODORI_OPT_VRAM_LIMIT_MB=0` にすること（FP32 重みだけで 2.9 GB）。
 
-上限 3072 MB は「チェックポイントが宣言する上限入力（text 256 token / caption 512 token /
-参照 30 s / 生成 30 s）で、CUDA Graph の LRU が埋まった状態」でも通ることを確認した安全運用値
-（09 参照）。LoRA・`num_candidates>1`・watermark 有効はこの余白の外なので、使うなら再計測する。
+上限 3840 MB は、上限を外して測った実必要量（宣言上限入力の stress で 3124 MiB、
+文長の異なるリクエストを巡回する長時間実行で 3458 MiB）に約 380 MiB の余白を足した値（10 参照）。
+09 の 3072 は上限を掛けた状態で測った値で、**長時間実行では 13 リクエスト目で OOM した**。
+LoRA・`num_candidates>1`・watermark 有効はこの余白の外なので、使うなら再計測する。
+
+### 他プロセスと GPU を共有するとき（10 参照）
+
+llama-swap の VLM などと同居させる場合は
+
+```bash
+IRODORI_OPT_CUDA_GRAPH=0 IRODORI_OPT_VRAM_LIMIT_MB=3072
+```
+
+を使う。CUDA Graph を切ると常駐量が `nvidia-smi` で 3979 → **2857 MiB** に下がり
+（reserved の頭打ちが 3458 → 2438 MiB）、代償は synth 1 発あたり +70 ms だけ。
+VLM 側は `NCMOE=11 ./bench/coexist_llama_swap.sh` で静的に 12.0 GB に固定する
+（`-fit on` のままだと load 時の空き容量しだいで VLM が 15.2 GB を掴み、TTS がロードできなくなる）。
