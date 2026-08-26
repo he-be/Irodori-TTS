@@ -59,6 +59,7 @@ uv run --no-sync python bench/bench_runtime.py \
 | スクリプト | 用途 |
 |---|---|
 | `bench_runtime.py` | warm ベンチ（stage timing / RTF / GPU util / VRAM / hash → JSON） |
+| `bench_load.py` | ロード/アンロードのプロファイル（子プロセスで cold load、phase 内訳、11） |
 | `run_ablation.sh` | 最適化スイッチを 1 つずつ足す ablation を順に実行 |
 | `check_equivalence.py` | legacy 経路と最適化経路を同一 runtime で比較（hash / max abs diff） |
 | `check_codec_fold.py` | codec weight_norm fold の bit 一致確認と decode 時間・VRAM |
@@ -72,6 +73,8 @@ uv run --no-sync python bench/bench_runtime.py \
 | `coexist_tts_worker.py` | 同居 stress の TTS 側ワーカー（別プロセス = 本物の load/unload） |
 | `coexist_llama_swap.sh` | `config.yaml` を変更せず `--n-cpu-moe` を注入して llama-swap を起動（10） |
 
+ロード用の道具は `prebake_runtime.py`（事前計算バンドルの生成 / `--list` / `--prune`、11 参照）。
+
 最適化スイッチは `irodori_tts/opt_config.py` の `IRODORI_OPT_*` 環境変数（既定は全部 on、watermark は off）。
 
 ## 品質の扱い
@@ -84,7 +87,7 @@ uv run --no-sync python bench/bench_runtime.py \
   max abs diff ≤ 1e-3**。BF16 では 40 step の Euler 積分がこの誤差をカオス的に増幅するので、
   BF16 同士の bit 比較はしない（02 参照）。
 
-## 現在の既定（10 時点）
+## 現在の既定（11 時点）
 
 `infer.py` / Gradio とも bf16 が既定。`IRODORI_OPT_*` は全部 on（watermark off、codec 重み fp32 +
 decode のみ bf16 autocast、decode chunk 96/16、参照 encode chunk 96/32、CUDA Graph は
@@ -92,6 +95,10 @@ entry 6 / static 予算 256 MB / entry ごと pool / latent 384 frame 超は eag
 **VRAM 上限 3840 MB**）。DiT compile は常駐プロセス向けに
 `IRODORI_OPT_COMPILE_DIT=1`（初回 45〜80 s、07 参照）。
 FP32 で動かすときは `IRODORI_OPT_VRAM_LIMIT_MB=0` にすること（FP32 重みだけで 2.9 GB）。
+
+ロードは skip-init / prebake バンドル / 並列ロードが既定で on（`IRODORI_OPT_SKIP_INIT`,
+`IRODORI_OPT_PREBAKE`, `IRODORI_OPT_PREBAKE_DIR`, `IRODORI_OPT_LOAD_PARALLEL`）。
+バンドルは `prebake_runtime.py` で 1 回作る。無ければ黙って通常経路になる（11 参照）。
 
 上限 3840 MB は、上限を外して測った実必要量（宣言上限入力の stress で 3124 MiB、
 文長の異なるリクエストを巡回する長時間実行で 3458 MiB）に約 380 MiB の余白を足した値（10 参照）。

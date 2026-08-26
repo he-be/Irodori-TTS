@@ -1,0 +1,218 @@
+{
+  "tag": "11_offline",
+  "repeats": 3,
+  "checkpoint": "Aratako/Irodori-TTS-v4.1-Small",
+  "precision": "bf16",
+  "env": {
+    "BENCH_LOAD_HF": "Aratako/Irodori-TTS-v4.1-Small",
+    "BENCH_LOAD_PRECISION": "bf16",
+    "HF_HUB_OFFLINE": "1"
+  },
+  "median": {
+    "t_import_torch": 0.9782977719951305,
+    "t_import_pkg": 0.167244855001627,
+    "t_cuda_init": 0.24461268299637595,
+    "t_from_key": 3.3558565589992213,
+    "t_process_to_loaded": 4.827013335998345,
+    "t_unload": 0.35787637600151356,
+    "rss_mib": 1886.22265625,
+    "smi_loaded_mib": 2136.0,
+    "alloc_mib": 1872.666015625,
+    "reserved_mib": 1974.0
+  },
+  "phases_median": {
+    "prebake_lookup": 0.00037216000055195764,
+    "transformers_import": 0.3155435930020758,
+    "model_construct": 3.00500117699994,
+    "bundle_model_read": 1.9647006411105394e-05,
+    "load_state_dict": 0.013630248999106698,
+    "to_device": 0.006345446003251709,
+    "tokenizer": 1.7282000044360757e-05,
+    "caption_tokenizer": 7.70499900681898e-06,
+    "codec_load": 1.0149000445380807e-05,
+    "prewarm_rope": 0.0018136340004275553,
+    "graph_runner_init": 2.6770001568365842e-05
+  },
+  "runs": [
+    {
+      "t_import_torch": 0.9660084479983198,
+      "t_import_pkg": 0.167244855001627,
+      "t_cuda_init": 0.3064256479992764,
+      "t_from_key": 3.3564558059952105,
+      "t_process_to_loaded": 4.875117073999718,
+      "phases": [
+        {
+          "name": "prebake_lookup",
+          "seconds": 0.00037216000055195764
+        },
+        {
+          "name": "transformers_import",
+          "seconds": 0.3155435930020758
+        },
+        {
+          "name": "model_construct",
+          "seconds": 3.0121514400016167
+        },
+        {
+          "name": "bundle_model_read",
+          "seconds": 1.9647006411105394e-05
+        },
+        {
+          "name": "load_state_dict",
+          "seconds": 0.013630248999106698
+        },
+        {
+          "name": "to_device",
+          "seconds": 0.006477775001258124
+        },
+        {
+          "name": "tokenizer",
+          "seconds": 1.7812999431043863e-05
+        },
+        {
+          "name": "caption_tokenizer",
+          "seconds": 7.825001375749707e-06
+        },
+        {
+          "name": "codec_load",
+          "seconds": 1.0228999599348754e-05
+        },
+        {
+          "name": "prewarm_rope",
+          "seconds": 0.0017790089987101965
+        },
+        {
+          "name": "graph_runner_init",
+          "seconds": 2.5307002943009138e-05
+        }
+      ],
+      "alloc_mib": 1872.666015625,
+      "reserved_mib": 1974.0,
+      "smi_loaded_mib": 2136.0,
+      "rss_mib": 1881.25390625,
+      "t_unload": 0.35787637600151356,
+      "reserved_after_unload_mib": 0.0,
+      "smi_after_unload_mib": 162.0
+    },
+    {
+      "t_import_torch": 0.9804914119958994,
+      "t_import_pkg": 0.16629045800073072,
+      "t_cuda_init": 0.24461268299637595,
+      "t_from_key": 3.3558565589992213,
+      "t_process_to_loaded": 4.827013335998345,
+      "phases": [
+        {
+          "name": "prebake_lookup",
+          "seconds": 0.00037667899596272036
+        },
+        {
+          "name": "transformers_import",
+          "seconds": 0.5015124960045796
+        },
+        {
+          "name": "model_construct",
+          "seconds": 2.8248692639972433
+        },
+        {
+          "name": "bundle_model_read",
+          "seconds": 1.8675003957469016e-05
+        },
+        {
+          "name": "load_state_dict",
+          "seconds": 0.013165094002033584
+        },
+        {
+          "name": "to_device",
+          "seconds": 0.006345446003251709
+        },
+        {
+          "name": "tokenizer",
+          "seconds": 1.5890000213403255e-05
+        },
+        {
+          "name": "caption_tokenizer",
+          "seconds": 7.635004294570535e-06
+        },
+        {
+          "name": "codec_load",
+          "seconds": 9.457005944568664e-06
+        },
+        {
+          "name": "prewarm_rope",
+          "seconds": 0.0018136340004275553
+        },
+        {
+          "name": "graph_runner_init",
+          "seconds": 2.6770001568365842e-05
+        }
+      ],
+      "alloc_mib": 1872.666015625,
+      "reserved_mib": 1974.0,
+      "smi_loaded_mib": 2136.0,
+      "rss_mib": 1886.30859375,
+      "t_unload": 0.3562026549989241,
+      "reserved_after_unload_mib": 0.0,
+      "smi_after_unload_mib": 162.0
+    },
+    {
+      "t_import_torch": 0.9782977719951305,
+      "t_import_pkg": 0.16918744999566115,
+      "t_cuda_init": 0.1934870850018342,
+      "t_from_key": 3.347048691000964,
+      "t_process_to_loaded": 4.768959647000884,
+      "phases": [
+        {
+          "name": "prebake_lookup",
+          "seconds": 0.0003694660044857301
+        },
+        {
+          "name": "transformers_import",
+          "seconds": 0.3125266909992206
+        },
+        {
+          "name": "model_construct",
+          "seconds": 3.00500117699994
+        },
+        {
+          "name": "bundle_model_read",
+          "seconds": 2.8442998882383108e-05
+        },
+        {
+          "name": "load_state_dict",
+          "seconds": 0.01402462200348964
+        },
+        {
+          "name": "to_device",
+          "seconds": 0.00624147000053199
+        },
+        {
+          "name": "tokenizer",
+          "seconds": 1.7282000044360757e-05
+        },
+        {
+          "name": "caption_tokenizer",
+          "seconds": 7.70499900681898e-06
+        },
+        {
+          "name": "codec_load",
+          "seconds": 1.0149000445380807e-05
+        },
+        {
+          "name": "prewarm_rope",
+          "seconds": 0.001923761003126856
+        },
+        {
+          "name": "graph_runner_init",
+          "seconds": 2.7100999432150275e-05
+        }
+      ],
+      "alloc_mib": 1872.666015625,
+      "reserved_mib": 1974.0,
+      "smi_loaded_mib": 2136.0,
+      "rss_mib": 1886.22265625,
+      "t_unload": 0.3600950690015452,
+      "reserved_after_unload_mib": 0.0,
+      "smi_after_unload_mib": 162.0
+    }
+  ]
+}

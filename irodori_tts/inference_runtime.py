@@ -4,13 +4,15 @@ import gc
 import hashlib
 import json
 import math
+import os
 import secrets
 import threading
 import time
 from collections import OrderedDict
 from collections.abc import Callable
-from contextlib import nullcontext
-from dataclasses import dataclass
+from concurrent.futures import Future, ThreadPoolExecutor
+from contextlib import contextmanager, nullcontext
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -19,12 +21,14 @@ import torchaudio
 from safetensors import safe_open
 from safetensors.torch import load_file as load_safetensors_file
 
+from . import prebake as prebake_mod
 from .codec import DACVAECodec, patchify_latent, unpatchify_latent
 from .config import ModelConfig, merge_dataclass_overrides
 from .duration import build_duration_features
+from .fast_init import skip_random_init
 from .lora import checkpoint_state_uses_lora, is_lora_adapter_dir, load_lora_adapter
 from .model import TextToLatentRFDiT
-from .opt_config import get_opt_config
+from .opt_config import get_opt_config, set_opt_config
 from .quantization import (
     is_torchao_quantized_state_dict,
     parse_quantization_metadata,
@@ -38,6 +42,43 @@ from .speaker_inversion import (
 from .text_normalization import normalize_text
 from .tokenizer import PretrainedTextTokenizer
 from .watermark import SilentCipherWatermarker
+
+_LOAD_TRACE: list[tuple[str, float]] = []
+
+
+def _load_trace_enabled() -> bool:
+    return os.environ.get("IRODORI_OPT_LOAD_TRACE", "0").strip().lower() not in {
+        "0",
+        "false",
+        "off",
+        "no",
+        "",
+    }
+
+
+@contextmanager
+def _load_phase(name: str):
+    """Record the wall time of one load phase when IRODORI_OPT_LOAD_TRACE=1."""
+    if not _load_trace_enabled():
+        yield
+        return
+    if torch.cuda.is_available() and torch.cuda.is_initialized():
+        torch.cuda.synchronize()
+    t0 = time.perf_counter()
+    try:
+        yield
+    finally:
+        if torch.cuda.is_available() and torch.cuda.is_initialized():
+            torch.cuda.synchronize()
+        _LOAD_TRACE.append((name, time.perf_counter() - t0))
+
+
+def get_load_trace() -> list[tuple[str, float]]:
+    return list(_LOAD_TRACE)
+
+
+def reset_load_trace() -> None:
+    _LOAD_TRACE.clear()
 
 
 def _is_mps_available() -> bool:
@@ -619,6 +660,158 @@ def download_hf_checkpoint(source: str) -> str:
     return str(checkpoint_path)
 
 
+def _prebake_identity(
+    *,
+    key: RuntimeKey,
+    checkpoint_path: Path,
+    model_device: torch.device,
+    codec_device: torch.device,
+) -> dict:
+    return prebake_mod.source_identity(
+        checkpoint=checkpoint_path,
+        codec_repo=key.codec_repo,
+        model_precision=key.model_precision,
+        codec_precision=key.codec_precision,
+        model_device_type=model_device.type,
+        codec_device_type=codec_device.type,
+        fold_weight_norm=bool(get_opt_config().codec_fold_weight_norm),
+    )
+
+
+def _read_bundle_state(bundle: prebake_mod.PrebakeBundle, which: str, device: torch.device):
+    """Worker body for the prefetch threads (safetensors releases the GIL while copying)."""
+    if device.type == "cuda":
+        torch.cuda.set_device(device.index if device.index is not None else 0)
+    if which == "model":
+        return bundle.load_model_state(device=str(device))
+    return bundle.load_codec_state(device=str(device))
+
+
+def _build_codec(
+    *,
+    key: RuntimeKey,
+    codec_device: torch.device,
+    codec_dtype: torch.dtype,
+    bundle: prebake_mod.PrebakeBundle | None,
+    fold_weight_norm: bool,
+) -> DACVAECodec:
+    if codec_device.type == "cuda":
+        torch.cuda.set_device(codec_device.index if codec_device.index is not None else 0)
+    prebaked: dict = {}
+    if bundle is not None:
+        prebaked = {
+            "prebaked_state": bundle.load_codec_state(device=str(codec_device)),
+            "prebaked_kwargs": bundle.manifest["dacvae_kwargs"],
+        }
+    return DACVAECodec.load(
+        repo_id=key.codec_repo,
+        device=str(codec_device),
+        dtype=codec_dtype,
+        deterministic_encode=bool(key.codec_deterministic_encode),
+        deterministic_decode=bool(key.codec_deterministic_decode),
+        fold_weight_norm=bool(fold_weight_norm),
+        **prebaked,
+    )
+
+
+def _load_tokenizer_worker(
+    *, repo_id: str, add_bos: bool, local_files_only: bool, revision: str | None
+) -> PretrainedTextTokenizer:
+    return PretrainedTextTokenizer.from_pretrained(
+        repo_id=repo_id,
+        add_bos=add_bos,
+        local_files_only=local_files_only,
+        revision=revision,
+    )
+
+
+def _find_prebake_bundle(
+    *,
+    key: RuntimeKey,
+    checkpoint_path: Path,
+    model_device: torch.device,
+    codec_device: torch.device,
+) -> prebake_mod.PrebakeBundle | None:
+    try:
+        identity = _prebake_identity(
+            key=key,
+            checkpoint_path=checkpoint_path,
+            model_device=model_device,
+            codec_device=codec_device,
+        )
+        return prebake_mod.find(prebake_mod.default_root(), identity)
+    except OSError:
+        return None
+
+
+def build_prebake_bundle(key: RuntimeKey, root: Path | None = None) -> Path:
+    """Load ``key`` the slow way once and write the finished tensors to a bundle.
+
+    Returns the bundle directory. The runtime picks it up automatically on the
+    next load (unless ``IRODORI_OPT_PREBAKE=0``).
+    """
+    from .codec import resolve_codec_weights
+
+    model_device = resolve_runtime_device(key.model_device)
+    codec_device = resolve_runtime_device(key.codec_device)
+    checkpoint_path = Path(key.checkpoint)
+
+    _, model_cfg_dict, train_cfg, text_encoder_config = _load_checkpoint_for_inference(
+        checkpoint_path
+    )
+    model_cfg = merge_dataclass_overrides(
+        ModelConfig(),
+        model_cfg_dict,
+        section="checkpoint model_config",
+    )
+
+    # Always build from the slow path: reusing an existing bundle here would make
+    # "rebuild" a no-op after a change that the identity does not cover.
+    saved_opt = get_opt_config()
+    set_opt_config(replace(saved_opt, prebake=False))
+    try:
+        runtime = InferenceRuntime.from_key(key)
+    finally:
+        set_opt_config(saved_opt)
+    if is_torchao_quantized_state_dict(runtime.model.state_dict()):
+        raise ValueError(
+            "Quantized checkpoints cannot be prebaked: torchao tensor subclasses are "
+            "not representable in safetensors."
+        )
+    dacvae_kwargs = dict(getattr(runtime.codec.model, "metadata", {}).get("kwargs", {}))
+    if not dacvae_kwargs:
+        raise ValueError("Codec has no DACVAE constructor kwargs; cannot prebake it.")
+
+    identity = _prebake_identity(
+        key=key,
+        checkpoint_path=checkpoint_path,
+        model_device=model_device,
+        codec_device=codec_device,
+    )
+    directory = prebake_mod.write(
+        root or prebake_mod.default_root(),
+        identity=identity,
+        model_state=runtime.model.state_dict(),
+        codec_state=runtime.codec.model.state_dict(),
+        model_config_json=json.dumps(model_cfg_dict, ensure_ascii=False, sort_keys=True),
+        text_encoder_config_json=(
+            None
+            if text_encoder_config is None
+            else json.dumps(text_encoder_config, ensure_ascii=False, sort_keys=True)
+        ),
+        train_config_json=(
+            None if train_cfg is None else json.dumps(train_cfg, ensure_ascii=False, sort_keys=True)
+        ),
+        dacvae_kwargs=dacvae_kwargs,
+        codec_weights=prebake_mod.file_identity(resolve_codec_weights(key.codec_repo)),
+        codec_latent_dim=int(runtime.codec.latent_dim),
+        codec_sample_rate=int(runtime.codec.sample_rate),
+        extra={"latent_dim_check": int(model_cfg.latent_dim)},
+    )
+    runtime.unload()
+    return directory
+
+
 def _resolve_tokenizer_source(checkpoint_path: Path, fallback_repo: str) -> tuple[str, bool]:
     bundled_candidates = (
         checkpoint_path.parent / "tokenizer",
@@ -688,7 +881,8 @@ class InferenceRuntime:
                 fraction = min(1.0, float(opt.vram_limit_mb) * 2**20 / float(total))
                 torch.cuda.set_per_process_memory_fraction(fraction, device_index)
             # RoPE caches must be fully materialized before any CUDA Graph capture.
-            self.model.prewarm_rope(max_latent_len=4096, max_speaker_len=4096)
+            with _load_phase("prewarm_rope"):
+                self.model.prewarm_rope(max_latent_len=4096, max_speaker_len=4096)
             # Keep the eager forward reachable for A/B checks (bench/check_equivalence.py).
             self._eager_forward_with_encoded_conditions = self.model.forward_with_encoded_conditions
             if opt.compile_dit and not key.compile_model:
@@ -703,15 +897,16 @@ class InferenceRuntime:
             if opt.cuda_graph and not key.compile_model:
                 from .cuda_graph import RFStepGraphRunner
 
-                self._graph_runner = RFStepGraphRunner(
-                    device=self.model_device,
-                    max_entries=int(opt.graph_max_entries),
-                    capture_after=int(opt.graph_capture_after),
-                    max_static_bytes=int(opt.graph_max_static_mb) * 2**20,
-                    shared_pool=bool(opt.graph_shared_pool),
-                    max_latent_frames=int(opt.graph_max_latent_frames),
-                    release_pool_on_evict=bool(opt.graph_release_pool_on_evict),
-                )
+                with _load_phase("graph_runner_init"):
+                    self._graph_runner = RFStepGraphRunner(
+                        device=self.model_device,
+                        max_entries=int(opt.graph_max_entries),
+                        capture_after=int(opt.graph_capture_after),
+                        max_static_bytes=int(opt.graph_max_static_mb) * 2**20,
+                        shared_pool=bool(opt.graph_shared_pool),
+                        max_latent_frames=int(opt.graph_max_latent_frames),
+                        release_pool_on_evict=bool(opt.graph_release_pool_on_evict),
+                    )
 
     @classmethod
     def from_key(cls, key: RuntimeKey) -> InferenceRuntime:
@@ -727,29 +922,135 @@ class InferenceRuntime:
         )
 
         checkpoint_path = Path(key.checkpoint)
-        model_state, model_cfg_dict, train_cfg, text_encoder_config = (
-            _load_checkpoint_for_inference(checkpoint_path)
-        )
+        opt = get_opt_config()
+
+        bundle = None
+        if opt.prebake and not key.compile_model:
+            with _load_phase("prebake_lookup"):
+                bundle = _find_prebake_bundle(
+                    key=key,
+                    checkpoint_path=checkpoint_path,
+                    model_device=model_device,
+                    codec_device=codec_device,
+                )
+
+        model_state: dict[str, torch.Tensor] | None = None
+        if bundle is not None:
+            model_cfg_dict = bundle.model_config()
+            train_cfg = bundle.train_config()
+            text_encoder_config = bundle.text_encoder_config()
+        else:
+            with _load_phase("ckpt_read"):
+                model_state, model_cfg_dict, train_cfg, text_encoder_config = (
+                    _load_checkpoint_for_inference(checkpoint_path)
+                )
         model_cfg = merge_dataclass_overrides(
             ModelConfig(),
             model_cfg_dict,
             section="checkpoint model_config",
         )
 
-        model = TextToLatentRFDiT(
-            model_cfg,
-            pretrained_backbone_config=text_encoder_config,
-            load_pretrained_backbone_weights=not model_cfg.use_pretrained_text_encoder,
+        # The transformers import + module construction below is ~2.3 s of pure
+        # GIL-bound Python. The bundle reads (safetensors -> CUDA) and the
+        # tokenizer load (Rust) both release the GIL, so they ride along for free.
+        pool: ThreadPoolExecutor | None = None
+        model_state_future: Future | None = None
+        codec_future: Future | None = None
+        tokenizer_future: Future | None = None
+        caption_tokenizer_future: Future | None = None
+
+        text_tokenizer_source, text_tokenizer_is_local = _resolve_tokenizer_source(
+            checkpoint_path,
+            model_cfg.text_tokenizer_repo,
         )
-        quantized_model = is_torchao_quantized_state_dict(model_state)
-        model.load_state_dict(
-            model_state,
-            assign=model_cfg.use_pretrained_text_encoder or quantized_model,
-        )
-        del model_state
-        if not get_opt_config().cpu_cast:
-            model = model.to(model_device)
-        model = _move_inference_module(model, device=model_device, dtype=model_dtype)
+        caption_tokenizer_source: str | None = None
+        caption_tokenizer_is_local = False
+        caption_shares_text_tokenizer = False
+        if model_cfg.use_caption_condition:
+            caption_tokenizer_source, caption_tokenizer_is_local = _resolve_tokenizer_source(
+                checkpoint_path,
+                model_cfg.caption_tokenizer_repo_resolved,
+            )
+            caption_shares_text_tokenizer = (
+                caption_tokenizer_source == text_tokenizer_source
+                and caption_tokenizer_is_local == text_tokenizer_is_local
+                and bool(model_cfg.caption_add_bos_resolved) == bool(model_cfg.text_add_bos)
+            )
+
+        if opt.load_parallel:
+            pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="irodori-load")
+            if bundle is not None:
+                model_state_future = pool.submit(_read_bundle_state, bundle, "model", model_device)
+            codec_future = pool.submit(
+                _build_codec,
+                key=key,
+                codec_device=codec_device,
+                codec_dtype=codec_dtype,
+                bundle=bundle,
+                fold_weight_norm=bool(opt.codec_fold_weight_norm),
+            )
+            with _load_phase("transformers_import"):
+                # Import the package on this thread first so the two threads below
+                # never race on ``transformers.__init__``.
+                try:
+                    import transformers  # noqa: F401
+                except ImportError:
+                    pass
+            tokenizer_future = pool.submit(
+                _load_tokenizer_worker,
+                repo_id=text_tokenizer_source,
+                add_bos=bool(model_cfg.text_add_bos),
+                local_files_only=text_tokenizer_is_local,
+                revision=None if text_tokenizer_is_local else model_cfg.text_encoder_revision,
+            )
+            if caption_tokenizer_source is not None and not caption_shares_text_tokenizer:
+                caption_tokenizer_future = pool.submit(
+                    _load_tokenizer_worker,
+                    repo_id=caption_tokenizer_source,
+                    add_bos=bool(model_cfg.caption_add_bos_resolved),
+                    local_files_only=caption_tokenizer_is_local,
+                    revision=(
+                        None if caption_tokenizer_is_local else model_cfg.text_encoder_revision
+                    ),
+                )
+
+        with _load_phase("model_construct"):
+            # The checkpoint covers every parameter (load_state_dict below is strict),
+            # so the random init would only be overwritten. See 11-load-time.md.
+            with skip_random_init(opt.skip_init):
+                model = TextToLatentRFDiT(
+                    model_cfg,
+                    pretrained_backbone_config=text_encoder_config,
+                    load_pretrained_backbone_weights=not model_cfg.use_pretrained_text_encoder,
+                )
+        if bundle is not None:
+            # Prebaked: the tensors are already in the runtime dtype on the runtime
+            # device, so assigning them is the whole "load".
+            with _load_phase("bundle_model_read"):
+                model_state = (
+                    model_state_future.result()
+                    if model_state_future is not None
+                    else bundle.load_model_state(device=str(model_device))
+                )
+            with _load_phase("load_state_dict"):
+                model.load_state_dict(model_state, strict=True, assign=True)
+            del model_state
+            with _load_phase("to_device"):
+                # Non-persistent buffers (RoPE inv_freq) are built on the CPU by the
+                # constructor and are not part of any state dict.
+                model = _move_inference_module(model, device=model_device, dtype=model_dtype)
+        else:
+            quantized_model = is_torchao_quantized_state_dict(model_state)
+            with _load_phase("load_state_dict"):
+                model.load_state_dict(
+                    model_state,
+                    assign=model_cfg.use_pretrained_text_encoder or quantized_model,
+                )
+            del model_state
+            with _load_phase("to_device"):
+                if not opt.cpu_cast:
+                    model = model.to(model_device)
+                model = _move_inference_module(model, device=model_device, dtype=model_dtype)
         model.eval()
         model = _maybe_compile_inference_model(
             model,
@@ -757,16 +1058,16 @@ class InferenceRuntime:
             dynamic=bool(key.compile_dynamic),
         )
 
-        text_tokenizer_source, text_tokenizer_is_local = _resolve_tokenizer_source(
-            checkpoint_path,
-            model_cfg.text_tokenizer_repo,
-        )
-        tokenizer = PretrainedTextTokenizer.from_pretrained(
-            repo_id=text_tokenizer_source,
-            add_bos=bool(model_cfg.text_add_bos),
-            local_files_only=text_tokenizer_is_local,
-            revision=None if text_tokenizer_is_local else model_cfg.text_encoder_revision,
-        )
+        with _load_phase("tokenizer"):
+            if tokenizer_future is not None:
+                tokenizer = tokenizer_future.result()
+            else:
+                tokenizer = _load_tokenizer_worker(
+                    repo_id=text_tokenizer_source,
+                    add_bos=bool(model_cfg.text_add_bos),
+                    local_files_only=text_tokenizer_is_local,
+                    revision=None if text_tokenizer_is_local else model_cfg.text_encoder_revision,
+                )
         if (
             not model_cfg.use_pretrained_text_encoder
             and tokenizer.vocab_size != model_cfg.text_vocab_size
@@ -777,18 +1078,22 @@ class InferenceRuntime:
             )
         caption_tokenizer = None
         if model_cfg.use_caption_condition:
-            caption_tokenizer_source, caption_tokenizer_is_local = _resolve_tokenizer_source(
-                checkpoint_path,
-                model_cfg.caption_tokenizer_repo_resolved,
-            )
-            caption_tokenizer = PretrainedTextTokenizer.from_pretrained(
-                repo_id=caption_tokenizer_source,
-                add_bos=model_cfg.caption_add_bos_resolved,
-                local_files_only=caption_tokenizer_is_local,
-                revision=(
-                    None if caption_tokenizer_is_local else model_cfg.text_encoder_revision
-                ),
-            )
+            with _load_phase("caption_tokenizer"):
+                if caption_shares_text_tokenizer:
+                    # v4 checkpoints ship one tokenizer for both conditions; loading it
+                    # twice costs ~0.35 s and the wrapper is stateless at inference.
+                    caption_tokenizer = tokenizer
+                elif caption_tokenizer_future is not None:
+                    caption_tokenizer = caption_tokenizer_future.result()
+                else:
+                    caption_tokenizer = _load_tokenizer_worker(
+                        repo_id=str(caption_tokenizer_source),
+                        add_bos=bool(model_cfg.caption_add_bos_resolved),
+                        local_files_only=caption_tokenizer_is_local,
+                        revision=(
+                            None if caption_tokenizer_is_local else model_cfg.text_encoder_revision
+                        ),
+                    )
             if (
                 not model_cfg.use_pretrained_text_encoder
                 and caption_tokenizer.vocab_size != model_cfg.caption_vocab_size_resolved
@@ -811,19 +1116,24 @@ class InferenceRuntime:
             else:
                 default_caption_max_len = default_text_max_len
 
-        codec = DACVAECodec.load(
-            repo_id=key.codec_repo,
-            device=str(codec_device),
-            dtype=codec_dtype,
-            deterministic_encode=bool(key.codec_deterministic_encode),
-            deterministic_decode=bool(key.codec_deterministic_decode),
-            fold_weight_norm=bool(get_opt_config().codec_fold_weight_norm),
-        )
+        with _load_phase("codec_load"):
+            if codec_future is not None:
+                codec = codec_future.result()
+            else:
+                codec = _build_codec(
+                    key=key,
+                    codec_device=codec_device,
+                    codec_dtype=codec_dtype,
+                    bundle=bundle,
+                    fold_weight_norm=bool(opt.codec_fold_weight_norm),
+                )
         if model_cfg.latent_dim != codec.latent_dim:
             raise ValueError(
                 f"Latent dimension mismatch: checkpoint latent_dim={model_cfg.latent_dim} but codec latent_dim={codec.latent_dim}. "
                 "Use a compatible codec/checkpoint pair."
             )
+        if pool is not None:
+            pool.shutdown(wait=True)
 
         return cls(
             key=key,

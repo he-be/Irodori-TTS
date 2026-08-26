@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import math
 import sys
 from dataclasses import dataclass
@@ -9,7 +10,66 @@ import torch
 import torchaudio
 from huggingface_hub import hf_hub_download
 
+from .fast_init import skip_random_init
+from .opt_config import get_opt_config
+
 _CODEC_DEFAULT = object()
+
+
+def _import_dacvae():
+    # Prefer installed package; fallback to local clone at ../dacvae.
+    try:
+        from dacvae import DACVAE
+    except ImportError:
+        local_repo = Path(__file__).resolve().parents[2] / "dacvae"
+        if local_repo.exists():
+            sys.path.insert(0, str(local_repo))
+        from dacvae import DACVAE
+    return DACVAE
+
+
+def resolve_codec_weights(repo_id: str) -> str:
+    """Local path of the DACVAE ``weights.pth`` for ``repo_id`` (downloads if needed)."""
+    location = str(repo_id).strip()
+    if location.startswith("hf://"):
+        location = location[len("hf://") :]
+    if not Path(location).exists() and "/" in location and not location.endswith(".pth"):
+        try:
+            resolved = hf_hub_download(repo_id=location, filename="weights.pth")
+            print(f"[codec] dacvae: hf://{repo_id} -> {resolved}", flush=True)
+            return resolved
+        except Exception:
+            # Let DACVAE.load surface a clearer error if this is not a valid path/repo.
+            return location
+    return location
+
+
+def _load_dacvae_weights(dacvae_cls, location: str) -> torch.nn.Module:
+    """Build a DACVAE from a ``weights.pth`` without the throwaway random init.
+
+    ``audiotools``'s ``BaseModel.load`` first tries ``torch.package``, then builds
+    the module (0.6 s of ``uniform_`` for 107 M params) and loads the state dict
+    with ``strict=False``.  Here the state dict is loaded with ``strict=True``
+    instead, which is what makes skipping the init safe: a tensor the checkpoint
+    does not cover raises rather than staying uninitialized.
+    """
+    payload = torch.load(location, map_location="cpu", weights_only=True)
+    if not (
+        isinstance(payload, dict)
+        and isinstance(payload.get("state_dict"), dict)
+        and isinstance(payload.get("metadata"), dict)
+    ):
+        # Packaged (torch.package) or otherwise unusual checkpoint: let audiotools do it.
+        return dacvae_cls.load(location)
+
+    metadata = payload["metadata"]
+    class_keys = set(inspect.signature(dacvae_cls).parameters)
+    kwargs = {k: v for k, v in dict(metadata.get("kwargs", {})).items() if k in class_keys}
+    with skip_random_init(get_opt_config().skip_init):
+        model = dacvae_cls(**kwargs)
+    model.load_state_dict(payload["state_dict"], strict=True)
+    model.metadata = metadata
+    return model
 
 
 def patchify_latent(latent: torch.Tensor, patch_size: int) -> torch.Tensor:
@@ -77,33 +137,29 @@ class DACVAECodec:
         deterministic_decode: bool = True,
         normalize_db: float | None = -16.0,
         fold_weight_norm: bool = True,
+        prebaked_state: dict[str, torch.Tensor] | None = None,
+        prebaked_kwargs: dict | None = None,
     ) -> DACVAECodec:
-        # Prefer installed package; fallback to local clone at ../dacvae.
-        try:
-            from dacvae import DACVAE
-        except ImportError:
-            local_repo = Path(__file__).resolve().parents[2] / "dacvae"
-            if local_repo.exists():
-                sys.path.insert(0, str(local_repo))
-            from dacvae import DACVAE
+        DACVAE = _import_dacvae()
 
-        location = str(repo_id).strip()
-        if location.startswith("hf://"):
-            location = location[len("hf://") :]
-        if not Path(location).exists() and "/" in location and not location.endswith(".pth"):
-            try:
-                location = hf_hub_download(repo_id=location, filename="weights.pth")
-                print(f"[codec] dacvae: hf://{repo_id} -> {location}", flush=True)
-            except Exception:
-                # Let DACVAE.load surface a clearer error if this is not a valid path/repo.
-                pass
-
-        model = DACVAE.load(location).eval().to(device)
-        if fold_weight_norm:
-            folded = fold_weight_norm_(model)
-            print(f"[codec] folded weight_norm on {folded} conv layers", flush=True)
-        if dtype is not None:
-            model = model.to(dtype=dtype)
+        if prebaked_state is not None:
+            # Bundle path: the tensors are already folded, already in the target
+            # dtype and already on the target device (see prebake.py).
+            with skip_random_init(get_opt_config().skip_init):
+                model = DACVAE(**dict(prebaked_kwargs or {}))
+            model = model.eval()
+            if fold_weight_norm:
+                fold_weight_norm_(model)
+            model.load_state_dict(prebaked_state, strict=True, assign=True)
+            model = model.to(device)
+        else:
+            location = resolve_codec_weights(repo_id)
+            model = _load_dacvae_weights(DACVAE, location).eval().to(device)
+            if fold_weight_norm:
+                folded = fold_weight_norm_(model)
+                print(f"[codec] folded weight_norm on {folded} conv layers", flush=True)
+            if dtype is not None:
+                model = model.to(dtype=dtype)
 
         decoder = getattr(model, "decoder", None)
         if decoder is not None and hasattr(decoder, "alpha"):
@@ -126,13 +182,18 @@ class DACVAECodec:
 
         model_dtype = next(model.parameters()).dtype
         # Infer latent dimension by encoding a tiny random signal.
+        # This probe is load-bearing beyond the shape it reports: it is the first
+        # conv on this device, and it fixes the cuDNN algorithm choice for the
+        # encoder. Taking the latent dim from a manifest and skipping the probe
+        # changes every later encode bit-for-bit (see 11-load-time.md).
         dummy = torch.zeros(1, 1, 2048, device=device, dtype=model_dtype)
         with torch.inference_mode():
             z = model.encode(dummy)  # (B, D, T)
+        latent_dim = int(z.shape[1])
         return cls(
             model=model,
             sample_rate=int(model.sample_rate),
-            latent_dim=int(z.shape[1]),
+            latent_dim=latent_dim,
             device=torch.device(device),
             dtype=model_dtype,
             deterministic_encode=bool(deterministic_encode),

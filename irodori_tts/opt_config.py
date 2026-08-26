@@ -32,6 +32,11 @@ that A/B benchmarks can be run without code changes:
                                    3840 covers CUDA Graph pools; with IRODORI_OPT_CUDA_GRAPH=0 the
                                    steady state fits in 3072 (see docs/experiments/10)
     IRODORI_OPT_EMPTY_CACHE=1      release cached blocks after every request (default: off)
+    IRODORI_OPT_SKIP_INIT=0        keep the random weight init that the checkpoint overwrites (default: skipped)
+    IRODORI_OPT_PREBAKE=0          ignore the prebaked runtime bundle (default: use it when present)
+    IRODORI_OPT_PREBAKE_DIR=path   where prebaked bundles live (default: ~/.cache/irodori-tts/prebake)
+    IRODORI_OPT_LOAD_PARALLEL=0    load weights/tokenizer serially instead of overlapping them with
+                                   the transformers import (default: overlapped)
 
 The values are read once at first access.
 """
@@ -88,6 +93,9 @@ class OptConfig:
     encode_overlap_frames: int = 32
     vram_limit_mb: int = 3840
     empty_cache_after_request: bool = False
+    skip_init: bool = True
+    prebake: bool = True
+    load_parallel: bool = True
 
     @classmethod
     def from_env(cls) -> OptConfig:
@@ -119,6 +127,9 @@ class OptConfig:
             encode_overlap_frames=max(0, _env_int("IRODORI_OPT_ENCODE_OVERLAP", 32)),
             vram_limit_mb=max(0, _env_int("IRODORI_OPT_VRAM_LIMIT_MB", 3840)),
             empty_cache_after_request=_env_bool("IRODORI_OPT_EMPTY_CACHE", False),
+            skip_init=_env_bool("IRODORI_OPT_SKIP_INIT", True),
+            prebake=_env_bool("IRODORI_OPT_PREBAKE", True),
+            load_parallel=_env_bool("IRODORI_OPT_LOAD_PARALLEL", True),
         )
 
     def describe(self) -> str:

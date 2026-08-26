@@ -1,0 +1,194 @@
+{
+  "tag": "11_A_alloff",
+  "repeats": 3,
+  "checkpoint": "Aratako/Irodori-TTS-v4.1-Small",
+  "precision": "bf16",
+  "env": {
+    "BENCH_LOAD_HF": "Aratako/Irodori-TTS-v4.1-Small",
+    "BENCH_LOAD_PRECISION": "bf16",
+    "IRODORI_OPT_SKIP_INIT": "0",
+    "IRODORI_OPT_PREBAKE": "0",
+    "IRODORI_OPT_LOAD_PARALLEL": "0"
+  },
+  "median": {
+    "t_import_torch": 0.9818056559961406,
+    "t_import_pkg": 0.17255344799923478,
+    "t_cuda_init": 0.2540297810046468,
+    "t_from_key": 7.376047711004503,
+    "t_process_to_loaded": 9.027603849004663,
+    "t_unload": 0.36750613499316387,
+    "rss_mib": 1836.13671875,
+    "smi_loaded_mib": 2216.0,
+    "alloc_mib": 1872.666015625,
+    "reserved_mib": 2054.0
+  },
+  "phases_median": {
+    "ckpt_read": 0.01655765000032261,
+    "model_construct": 4.130679492001946,
+    "load_state_dict": 0.10603891299979296,
+    "to_device": 0.76776644000347,
+    "tokenizer": 0.5029518160008593,
+    "caption_tokenizer": 8.736999006941915e-06,
+    "codec_load": 1.837607597000897,
+    "prewarm_rope": 0.0018116009960067458,
+    "graph_runner_init": 2.6980997063219547e-05
+  },
+  "runs": [
+    {
+      "t_import_torch": 0.9818056559961406,
+      "t_import_pkg": 0.17255344799923478,
+      "t_cuda_init": 0.30448439400061034,
+      "t_from_key": 7.376047711004503,
+      "t_process_to_loaded": 9.12488763899455,
+      "phases": [
+        {
+          "name": "ckpt_read",
+          "seconds": 0.01637228100298671
+        },
+        {
+          "name": "model_construct",
+          "seconds": 4.130679492001946
+        },
+        {
+          "name": "load_state_dict",
+          "seconds": 0.10564479100139579
+        },
+        {
+          "name": "to_device",
+          "seconds": 0.7592098210006952
+        },
+        {
+          "name": "tokenizer",
+          "seconds": 0.49808011499408167
+        },
+        {
+          "name": "caption_tokenizer",
+          "seconds": 8.556002285331488e-06
+        },
+        {
+          "name": "codec_load",
+          "seconds": 1.8606239750006353
+        },
+        {
+          "name": "prewarm_rope",
+          "seconds": 0.001862255005107727
+        },
+        {
+          "name": "graph_runner_init",
+          "seconds": 2.6980997063219547e-05
+        }
+      ],
+      "alloc_mib": 1872.666015625,
+      "reserved_mib": 2054.0,
+      "smi_loaded_mib": 2216.0,
+      "rss_mib": 1850.39453125,
+      "t_unload": 0.3713248929998372,
+      "reserved_after_unload_mib": 0.0,
+      "smi_after_unload_mib": 162.0
+    },
+    {
+      "t_import_torch": 0.9700164629975916,
+      "t_import_pkg": 0.1699318340033642,
+      "t_cuda_init": 0.2540297810046468,
+      "t_from_key": 7.341260583998519,
+      "t_process_to_loaded": 9.022660533002636,
+      "phases": [
+        {
+          "name": "ckpt_read",
+          "seconds": 0.01688493599795038
+        },
+        {
+          "name": "model_construct",
+          "seconds": 4.11255397000059
+        },
+        {
+          "name": "load_state_dict",
+          "seconds": 0.10637024600146106
+        },
+        {
+          "name": "to_device",
+          "seconds": 0.76776644000347
+        },
+        {
+          "name": "tokenizer",
+          "seconds": 0.5029518160008593
+        },
+        {
+          "name": "caption_tokenizer",
+          "seconds": 8.736999006941915e-06
+        },
+        {
+          "name": "codec_load",
+          "seconds": 1.829655315996206
+        },
+        {
+          "name": "prewarm_rope",
+          "seconds": 0.0018116009960067458
+        },
+        {
+          "name": "graph_runner_init",
+          "seconds": 2.6720001187641174e-05
+        }
+      ],
+      "alloc_mib": 1872.666015625,
+      "reserved_mib": 2054.0,
+      "smi_loaded_mib": 2216.0,
+      "rss_mib": 1836.13671875,
+      "t_unload": 0.36611842200363753,
+      "reserved_after_unload_mib": 0.0,
+      "smi_after_unload_mib": 162.0
+    },
+    {
+      "t_import_torch": 0.9818214269980672,
+      "t_import_pkg": 0.17529149299662095,
+      "t_cuda_init": 0.19687605599756353,
+      "t_from_key": 7.385121143001015,
+      "t_process_to_loaded": 9.027603849004663,
+      "phases": [
+        {
+          "name": "ckpt_read",
+          "seconds": 0.01655765000032261
+        },
+        {
+          "name": "model_construct",
+          "seconds": 4.1360694090035395
+        },
+        {
+          "name": "load_state_dict",
+          "seconds": 0.10603891299979296
+        },
+        {
+          "name": "to_device",
+          "seconds": 0.7760172019989113
+        },
+        {
+          "name": "tokenizer",
+          "seconds": 0.5078321539986064
+        },
+        {
+          "name": "caption_tokenizer",
+          "seconds": 9.076997230295092e-06
+        },
+        {
+          "name": "codec_load",
+          "seconds": 1.837607597000897
+        },
+        {
+          "name": "prewarm_rope",
+          "seconds": 0.0016687009992892854
+        },
+        {
+          "name": "graph_runner_init",
+          "seconds": 3.0337003408931196e-05
+        }
+      ],
+      "alloc_mib": 1872.666015625,
+      "reserved_mib": 2054.0,
+      "smi_loaded_mib": 2216.0,
+      "rss_mib": 1832.54296875,
+      "t_unload": 0.36750613499316387,
+      "reserved_after_unload_mib": 0.0,
+      "smi_after_unload_mib": 162.0
+    }
+  ]
+}
