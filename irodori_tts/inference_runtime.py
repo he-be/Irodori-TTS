@@ -62,14 +62,12 @@ def _load_phase(name: str):
     if not _load_trace_enabled():
         yield
         return
-    if torch.cuda.is_available() and torch.cuda.is_initialized():
-        torch.cuda.synchronize()
+    torch.mps.synchronize()
     t0 = time.perf_counter()
     try:
         yield
     finally:
-        if torch.cuda.is_available() and torch.cuda.is_initialized():
-            torch.cuda.synchronize()
+        torch.mps.synchronize()
         _LOAD_TRACE.append((name, time.perf_counter() - t0))
 
 
@@ -88,73 +86,52 @@ def _is_mps_available() -> bool:
     return bool(torch.backends.mps.is_available())
 
 
-def _is_xpu_available() -> bool:
-    try:
-        return bool(torch.xpu.is_available())
-    except AttributeError:
-        return False
+MPS_DEVICE = torch.device("mps")
+
+
+def require_mps() -> torch.device:
+    """This build runs on Metal only. Raise early and loudly when MPS is unusable."""
+    if not _is_mps_available():
+        built = bool(getattr(torch.backends, "mps", None) and torch.backends.mps.is_built())
+        raise RuntimeError(
+            "Irodori-TTS (metal-local) requires the PyTorch MPS backend (Apple Silicon + "
+            f"macOS). torch={torch.__version__} mps_built={built} mps_available=False."
+        )
+    if os.environ.get("PYTORCH_ENABLE_MPS_FALLBACK", "0").strip() not in {"", "0"}:
+        raise RuntimeError(
+            "PYTORCH_ENABLE_MPS_FALLBACK is set; CPU fallback is forbidden in this build."
+        )
+    return MPS_DEVICE
 
 
 def resolve_runtime_device(device: str | torch.device) -> torch.device:
     resolved = torch.device(device)
-    if resolved.type == "cpu":
-        return resolved
-    if resolved.type == "cuda":
-        if not torch.cuda.is_available():
-            raise ValueError("CUDA device requested but torch.cuda.is_available() is False.")
-        return resolved
-    if resolved.type == "mps":
-        if resolved.index is not None:
-            raise ValueError("MPS device index is not supported. Use 'mps'.")
-        if not _is_mps_available():
-            raise ValueError("MPS device requested but torch.backends.mps.is_available() is False.")
-        return torch.device("mps")
-    if resolved.type == "xpu":
-        if resolved.index is not None:
-            raise ValueError("XPU device index is not supported. Use 'xpu'.")
-        if not _is_xpu_available():
-            raise ValueError("XPU device requested but torch.xpu.is_available() is False.")
-        return torch.device("xpu")
-    raise ValueError(
-        f"Unsupported inference device={resolved!s}. Expected one of: cpu, cuda, mps, xpu."
-    )
+    if resolved.type != "mps":
+        raise ValueError(
+            f"Unsupported inference device={resolved!s}: this build runs on Metal (mps) only."
+        )
+    if resolved.index is not None:
+        raise ValueError("MPS device index is not supported. Use 'mps'.")
+    return require_mps()
 
 
 def list_available_runtime_devices() -> list[str]:
-    devices: list[str] = []
-    if torch.cuda.is_available():
-        devices.append("cuda")
-    if _is_mps_available():
-        devices.append("mps")
-    if _is_xpu_available():
-        devices.append("xpu")
-    devices.append("cpu")
-    return devices
+    return ["mps"]
 
 
 def default_runtime_device() -> str:
-    return list_available_runtime_devices()[0]
+    return "mps"
 
 
 def list_available_runtime_precisions(device: str | torch.device) -> list[str]:
-    resolved = resolve_runtime_device(device)
-    if resolved.type in ("cuda", "xpu"):
-        # Local default: bf16 first (Gradio picks choices[0]).
-        return ["bf16", "fp32"]
-    return ["fp32"]
+    resolve_runtime_device(device)
+    # Local default: fp16 first (Gradio picks choices[0]); see docs/experiments/12-metal-port.md.
+    return ["fp16", "bf16", "fp32"]
 
 
 def _sync_device(device: torch.device) -> None:
-    if device.type == "cuda":
-        torch.cuda.synchronize(device)
-    elif device.type == "mps":
-        mps = getattr(torch, "mps", None)
-        if mps is not None and hasattr(mps, "synchronize"):
-            mps.synchronize()
-    elif device.type == "xpu":
-        xpu = getattr(torch, "xpu", None)
-        if xpu is not None and hasattr(xpu, "synchronize"):
-            xpu.synchronize()
+    if device.type == "mps":
+        torch.mps.synchronize()
 
 
 def _sync_devices(*devices: torch.device) -> None:
@@ -240,33 +217,13 @@ def find_flattening_point(
     return total_steps
 
 
-def _pad_sequence_to_bucket(
-    values: torch.Tensor,
-    mask: torch.Tensor,
-    bucket: int,
-    pad_value: float | int,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Pad (B, L, ...) values / (B, L) bool mask along L to a multiple of ``bucket``."""
-    if bucket <= 1:
-        return values, mask
-    length = int(values.shape[1])
-    target = int(math.ceil(length / bucket) * bucket)
-    if target == length:
-        return values, mask
-    extra = target - length
-    pad_shape = (values.shape[0], extra, *values.shape[2:])
-    pad_values = torch.full(pad_shape, pad_value, dtype=values.dtype, device=values.device)
-    pad_mask = torch.zeros((mask.shape[0], extra), dtype=mask.dtype, device=mask.device)
-    return torch.cat([values, pad_values], dim=1), torch.cat([mask, pad_mask], dim=1)
-
-
 @dataclass(frozen=True)
 class RuntimeKey:
     checkpoint: str
     model_device: str
     codec_repo: str = "Aratako/Semantic-DACVAE-Japanese-32dim"
     model_precision: str = "fp32"
-    codec_device: str = "cpu"
+    codec_device: str = "mps"
     codec_precision: str = "fp32"
     codec_deterministic_encode: bool = True
     codec_deterministic_decode: bool = True
@@ -374,6 +331,11 @@ def _move_inference_module(
             for name, buffer in child._buffers.items():
                 if buffer is None:
                     continue
+                if name == "_freqs_cis_cache":
+                    # RoPE tables stay fp32 (the rotation is applied in fp32); only move.
+                    if buffer.device != device:
+                        child._buffers[name] = buffer.to(device=device)
+                    continue
                 if buffer.is_floating_point() and buffer.dtype != dtype:
                     child._buffers[name] = buffer.to(device=device, dtype=dtype)
                 elif buffer.device != device:
@@ -388,10 +350,10 @@ def resolve_runtime_dtype(*, precision: str, device: torch.device) -> torch.dtyp
     if mode == "fp32":
         return torch.float32
     if mode == "bf16":
-        if device.type not in ("cuda", "xpu"):
-            raise ValueError("precision='bf16' currently requires CUDA or XPU device.")
         return torch.bfloat16
-    raise ValueError(f"Unsupported precision={precision!r}. Expected one of: fp32, bf16.")
+    if mode == "fp16":
+        return torch.float16
+    raise ValueError(f"Unsupported precision={precision!r}. Expected one of: fp32, fp16, bf16.")
 
 
 def resolve_cfg_scales(
@@ -678,13 +640,38 @@ def _prebake_identity(
     )
 
 
-def _read_bundle_state(bundle: prebake_mod.PrebakeBundle, which: str, device: torch.device):
-    """Worker body for the prefetch threads (safetensors releases the GIL while copying)."""
-    if device.type == "cuda":
-        torch.cuda.set_device(device.index if device.index is not None else 0)
+def _read_bundle_state(bundle: prebake_mod.PrebakeBundle, which: str):
+    """Worker body for the prefetch threads (safetensors releases the GIL while copying).
+
+    The tensors land on the CPU: only the main thread may touch the MPS stream (Metal
+    asserts when two threads encode concurrently), and on unified memory the final
+    ``.to("mps")`` is a plain copy.
+    """
     if which == "model":
-        return bundle.load_model_state(device=str(device))
-    return bundle.load_codec_state(device=str(device))
+        return bundle.load_model_state(device="cpu")
+    return bundle.load_codec_state(device="cpu")
+
+
+def _prepare_codec_cpu(
+    *,
+    key: RuntimeKey,
+    codec_dtype: torch.dtype,
+    bundle: prebake_mod.PrebakeBundle | None,
+    fold_weight_norm: bool,
+) -> torch.nn.Module:
+    """Worker body: the CPU-only part of the codec load (unpickle / fold / cast)."""
+    prebaked: dict = {}
+    if bundle is not None:
+        prebaked = {
+            "prebaked_state": bundle.load_codec_state(device="cpu"),
+            "prebaked_kwargs": bundle.manifest["dacvae_kwargs"],
+        }
+    return DACVAECodec.prepare_cpu(
+        repo_id=key.codec_repo,
+        dtype=codec_dtype,
+        fold_weight_norm=bool(fold_weight_norm),
+        **prebaked,
+    )
 
 
 def _build_codec(
@@ -694,15 +681,13 @@ def _build_codec(
     codec_dtype: torch.dtype,
     bundle: prebake_mod.PrebakeBundle | None,
     fold_weight_norm: bool,
+    prepared_model: torch.nn.Module | None = None,
 ) -> DACVAECodec:
-    if codec_device.type == "cuda":
-        torch.cuda.set_device(codec_device.index if codec_device.index is not None else 0)
-    prebaked: dict = {}
-    if bundle is not None:
-        prebaked = {
-            "prebaked_state": bundle.load_codec_state(device=str(codec_device)),
-            "prebaked_kwargs": bundle.manifest["dacvae_kwargs"],
-        }
+    """Main-thread body: move the prepared codec to MPS and run the probe encode."""
+    if prepared_model is None:
+        prepared_model = _prepare_codec_cpu(
+            key=key, codec_dtype=codec_dtype, bundle=bundle, fold_weight_norm=fold_weight_norm
+        )
     return DACVAECodec.load(
         repo_id=key.codec_repo,
         device=str(codec_device),
@@ -710,7 +695,7 @@ def _build_codec(
         deterministic_encode=bool(key.codec_deterministic_encode),
         deterministic_decode=bool(key.codec_deterministic_decode),
         fold_weight_norm=bool(fold_weight_norm),
-        **prebaked,
+        prepared_model=prepared_model,
     )
 
 
@@ -859,54 +844,30 @@ class InferenceRuntime:
         self._infer_lock = threading.Lock()
         self._model_dtype = next(self.model.parameters()).dtype
         self._lora_adapter_names: dict[str, str] = {}
-        self._graph_runner = None
         self._active_variant = "base"
         # Reference caches (see docs/experiments/05-reference-cache.md).
-        self._ref_l1: "OrderedDict[tuple, torch.Tensor]" = OrderedDict()
-        self._ref_l2: "OrderedDict[tuple, tuple[torch.Tensor, torch.Tensor]]" = OrderedDict()
+        self._ref_l1: OrderedDict[tuple, torch.Tensor] = OrderedDict()
+        self._ref_l2: OrderedDict[tuple, tuple[torch.Tensor, torch.Tensor]] = OrderedDict()
         self.ref_cache_stats = {"l1_hit": 0, "l1_miss": 0, "l2_hit": 0, "l2_miss": 0}
         opt = get_opt_config()
-        if self.model_device.type == "cuda":
-            if opt.vram_limit_mb > 0:
-                # Hard cap on the caching allocator: the process never reserves more than this
-                # (the allocator frees cached blocks before raising OOM), so a co-located
-                # llama.cpp VLM can rely on the remainder. CUDA context (~0.4-0.5 GB) is
-                # outside this budget.
-                device_index = (
-                    self.model_device.index
-                    if self.model_device.index is not None
-                    else torch.cuda.current_device()
-                )
-                total = torch.cuda.get_device_properties(device_index).total_memory
-                fraction = min(1.0, float(opt.vram_limit_mb) * 2**20 / float(total))
-                torch.cuda.set_per_process_memory_fraction(fraction, device_index)
-            # RoPE caches must be fully materialized before any CUDA Graph capture.
-            with _load_phase("prewarm_rope"):
-                self.model.prewarm_rope(max_latent_len=4096, max_speaker_len=4096)
-            # Keep the eager forward reachable for A/B checks (bench/check_equivalence.py).
-            self._eager_forward_with_encoded_conditions = self.model.forward_with_encoded_conditions
-            if opt.compile_dit and not key.compile_model:
-                # Fuse the elementwise-heavy DiT blocks (RMSNorm/AdaLN/RoPE/gates); dynamic=True
-                # keeps one compiled artifact across latent-length buckets. The compiled callable
-                # is captured inside the CUDA Graph like the eager one.
-                self.model.forward_with_encoded_conditions = torch.compile(
-                    self.model.forward_with_encoded_conditions, dynamic=True
-                )
-            if opt.compile_codec:
-                self.codec.model.decoder = torch.compile(self.codec.model.decoder, dynamic=True)
-            if opt.cuda_graph and not key.compile_model:
-                from .cuda_graph import RFStepGraphRunner
-
-                with _load_phase("graph_runner_init"):
-                    self._graph_runner = RFStepGraphRunner(
-                        device=self.model_device,
-                        max_entries=int(opt.graph_max_entries),
-                        capture_after=int(opt.graph_capture_after),
-                        max_static_bytes=int(opt.graph_max_static_mb) * 2**20,
-                        shared_pool=bool(opt.graph_shared_pool),
-                        max_latent_frames=int(opt.graph_max_latent_frames),
-                        release_pool_on_evict=bool(opt.graph_release_pool_on_evict),
-                    )
+        if opt.mps_limit_mb > 0:
+            # Cap the MPS caching allocator. Unified memory is shared with everything else
+            # on the machine, so this is a courtesy budget rather than a VRAM wall.
+            recommended = float(torch.mps.recommended_max_memory())
+            fraction = min(1.0, float(opt.mps_limit_mb) * 2**20 / recommended)
+            torch.mps.set_per_process_memory_fraction(fraction)
+        with _load_phase("prewarm_rope"):
+            self.model.prewarm_rope(max_latent_len=4096, max_speaker_len=4096)
+        # Keep the eager forward reachable for A/B checks (bench/check_equivalence.py).
+        self._eager_forward_with_encoded_conditions = self.model.forward_with_encoded_conditions
+        if opt.compile_dit and not key.compile_model:
+            # inductor's MPS backend (Metal kernels for the elementwise-heavy DiT blocks:
+            # RMSNorm/AdaLN/RoPE/gates). dynamic=True keeps one artifact across latent lengths.
+            self.model.forward_with_encoded_conditions = torch.compile(
+                self.model.forward_with_encoded_conditions, dynamic=True
+            )
+        if opt.compile_codec:
+            self.codec.model.decoder = torch.compile(self.codec.model.decoder, dynamic=True)
 
     @classmethod
     def from_key(cls, key: RuntimeKey) -> InferenceRuntime:
@@ -951,8 +912,9 @@ class InferenceRuntime:
         )
 
         # The transformers import + module construction below is ~2.3 s of pure
-        # GIL-bound Python. The bundle reads (safetensors -> CUDA) and the
-        # tokenizer load (Rust) both release the GIL, so they ride along for free.
+        # GIL-bound Python. The bundle reads (safetensors -> CPU), the codec unpickle
+        # and the tokenizer load (Rust) all release the GIL, so they ride along for
+        # free. Nothing on a worker thread touches MPS.
         pool: ThreadPoolExecutor | None = None
         model_state_future: Future | None = None
         codec_future: Future | None = None
@@ -980,11 +942,10 @@ class InferenceRuntime:
         if opt.load_parallel:
             pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="irodori-load")
             if bundle is not None:
-                model_state_future = pool.submit(_read_bundle_state, bundle, "model", model_device)
+                model_state_future = pool.submit(_read_bundle_state, bundle, "model")
             codec_future = pool.submit(
-                _build_codec,
+                _prepare_codec_cpu,
                 key=key,
-                codec_device=codec_device,
                 codec_dtype=codec_dtype,
                 bundle=bundle,
                 fold_weight_norm=bool(opt.codec_fold_weight_norm),
@@ -1024,13 +985,13 @@ class InferenceRuntime:
                     load_pretrained_backbone_weights=not model_cfg.use_pretrained_text_encoder,
                 )
         if bundle is not None:
-            # Prebaked: the tensors are already in the runtime dtype on the runtime
-            # device, so assigning them is the whole "load".
+            # Prebaked: the tensors are already in the runtime dtype, so assigning
+            # them and moving the module is the whole "load".
             with _load_phase("bundle_model_read"):
                 model_state = (
                     model_state_future.result()
                     if model_state_future is not None
-                    else bundle.load_model_state(device=str(model_device))
+                    else bundle.load_model_state(device="cpu")
                 )
             with _load_phase("load_state_dict"):
                 model.load_state_dict(model_state, strict=True, assign=True)
@@ -1117,16 +1078,14 @@ class InferenceRuntime:
                 default_caption_max_len = default_text_max_len
 
         with _load_phase("codec_load"):
-            if codec_future is not None:
-                codec = codec_future.result()
-            else:
-                codec = _build_codec(
-                    key=key,
-                    codec_device=codec_device,
-                    codec_dtype=codec_dtype,
-                    bundle=bundle,
-                    fold_weight_norm=bool(opt.codec_fold_weight_norm),
-                )
+            codec = _build_codec(
+                key=key,
+                codec_device=codec_device,
+                codec_dtype=codec_dtype,
+                bundle=bundle,
+                fold_weight_norm=bool(opt.codec_fold_weight_norm),
+                prepared_model=codec_future.result() if codec_future is not None else None,
+            )
         if model_cfg.latent_dim != codec.latent_dim:
             raise ValueError(
                 f"Latent dimension mismatch: checkpoint latent_dim={model_cfg.latent_dim} but codec latent_dim={codec.latent_dim}. "
@@ -1192,21 +1151,25 @@ class InferenceRuntime:
                 log_fn(f"[runtime] prepare_lora: {stage_sec * 1000.0:.1f} ms")
 
     def _set_variant(self, variant: str) -> None:
-        """Model variant (base / LoRA adapter path). Invalidates captured CUDA Graphs."""
+        """Model variant (base / LoRA adapter path)."""
         if variant != self._active_variant:
             self._active_variant = variant
-            if self._graph_runner is not None:
-                self._graph_runner.set_variant(variant)
 
     @staticmethod
-    def _lru_put(cache: "OrderedDict", key: tuple, value: object, limit: int) -> None:
+    def _decode_autocast_dtype(opt) -> torch.dtype | None:
+        if not opt.decode_autocast:
+            return None
+        return torch.bfloat16 if opt.decode_autocast_dtype == "bf16" else torch.float16
+
+    @staticmethod
+    def _lru_put(cache: OrderedDict, key: tuple, value: object, limit: int) -> None:
         cache[key] = value
         cache.move_to_end(key)
         while len(cache) > limit:
             cache.popitem(last=False)
 
     @staticmethod
-    def _lru_get(cache: "OrderedDict", key: tuple) -> object | None:
+    def _lru_get(cache: OrderedDict, key: tuple) -> object | None:
         value = cache.get(key)
         if value is not None:
             cache.move_to_end(key)
@@ -1689,12 +1652,6 @@ class InferenceRuntime:
                 text_len = max(1, int(text_mask.sum(dim=1).max()))
                 text_ids = text_ids[:, :text_len]
                 text_mask = text_mask[:, :text_len]
-            # With CUDA Graphs, pad lengths to buckets so graph signatures repeat.
-            bucket_pad = self._graph_runner is not None and opt.cuda_graph
-            if bucket_pad:
-                text_ids, text_mask = _pad_sequence_to_bucket(
-                    text_ids, text_mask, int(opt.text_bucket), self.tokenizer.pad_token_id
-                )
             text_ids = text_ids.to(self.model_device)
             text_mask = text_mask.to(self.model_device)
             caption_ids = None
@@ -1717,13 +1674,6 @@ class InferenceRuntime:
                     )
                     caption_ids = caption_ids[:, :caption_len]
                     caption_mask = caption_mask[:, :caption_len]
-                if bucket_pad:
-                    caption_ids, caption_mask = _pad_sequence_to_bucket(
-                        caption_ids,
-                        caption_mask,
-                        int(opt.text_bucket),
-                        self.caption_tokenizer.pad_token_id,
-                    )
                 caption_ids = caption_ids.to(self.model_device)
                 caption_mask = caption_mask.to(self.model_device)
 
@@ -1745,9 +1695,6 @@ class InferenceRuntime:
                 )
             else:
                 ref_latent, ref_mask = None, None
-            if bucket_pad and ref_latent is not None and ref_mask is not None:
-                unit = int(self.model_cfg.speaker_patch_size) * int(opt.speaker_bucket)
-                ref_latent, ref_mask = _pad_sequence_to_bucket(ref_latent, ref_mask, unit, 0.0)
             l2_key = None
             if (
                 opt.reference_cache
@@ -1935,8 +1882,6 @@ class InferenceRuntime:
                 sway_coeff=float(req.sway_coeff),
                 encoded_conditions=encoded_conditions,
                 has_caption=has_caption_text,
-                graph_runner=self._graph_runner,
-                graph_bucket=int(opt.graph_bucket),
             )
             stage_sec = _measure_end(self.model_device, t0)
             stage_timings.append(("sample_rf", stage_sec))
@@ -1979,7 +1924,7 @@ class InferenceRuntime:
                         z[i : i + 1],
                         chunk_frames=int(opt.decode_chunk_frames) or None,
                         overlap_frames=int(opt.decode_overlap_frames),
-                        autocast_bf16=bool(opt.decode_autocast_bf16),
+                        autocast_dtype=self._decode_autocast_dtype(opt),
                     ).cpu()[0]
                     max_samples = target_samples
                     if bool(req.trim_tail):
@@ -2021,8 +1966,8 @@ class InferenceRuntime:
             total_to_decode = _measure_end(self.model_device, post_load_t0, self.codec_device)
             _log(f"[runtime] total_to_decode: {total_to_decode:.3f} s")
 
-        if opt.empty_cache_after_request and self.model_device.type == "cuda":
-            torch.cuda.empty_cache()
+        if opt.empty_cache_after_request:
+            torch.mps.empty_cache()
         _log("[runtime] done synthesize")
         return SamplingResult(
             audio=trimmed_audios[0],
@@ -2039,17 +1984,7 @@ class InferenceRuntime:
         del self.tokenizer
         del self.codec
         gc.collect()
-        for device in (self.model_device, self.codec_device):
-            if device.type == "cuda":
-                torch.cuda.empty_cache()
-            elif device.type == "mps":
-                mps = getattr(torch, "mps", None)
-                if mps is not None and hasattr(mps, "empty_cache"):
-                    mps.empty_cache()
-            elif device.type == "xpu":
-                xpu = getattr(torch, "xpu", None)
-                if xpu is not None and hasattr(xpu, "empty_cache"):
-                    xpu.empty_cache()
+        torch.mps.empty_cache()
 
 
 _RUNTIME_CACHE_LOCK = threading.Lock()

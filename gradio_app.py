@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import os as _os
 
-# Persistent server: the one-time DiT compile (~45-80 s at first request) pays for itself.
-# Override with IRODORI_OPT_COMPILE_DIT=0 if you want the first request to be fast instead.
+# Persistent server: the one-time inductor/MPS compile (~20 s DiT + ~4 s codec at the first
+# request) pays for itself (-17% wall, -30% decode; docs/experiments/12-metal-port.md).
+# Override with IRODORI_OPT_COMPILE_DIT=0 / IRODORI_OPT_COMPILE_CODEC=0 for a fast first request.
 _os.environ.setdefault("IRODORI_OPT_COMPILE_DIT", "1")
+_os.environ.setdefault("IRODORI_OPT_COMPILE_CODEC", "1")
 
 import argparse
 from datetime import datetime

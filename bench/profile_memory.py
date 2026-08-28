@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Per-stage peak VRAM profile for one synthesize() call per input."""
+"""Per-stage memory profile for one synthesize() call per input (MPS).
+
+MPS has no peak counter, so each wrapped stage is bracketed by a sampling thread
+and its peak is the max over samples (20 ms) of ``current_allocated_memory``."""
 
 from __future__ import annotations
 
 import argparse
-import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import torch
@@ -27,41 +30,57 @@ MiB = 2**20
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--precision", default="bf16")
+    parser.add_argument("--precision", default="fp16")
     parser.add_argument("--codec-precision", default="fp32")
     parser.add_argument("--inputs", nargs="+", default=["short", "long"])
     args = parser.parse_args()
 
-    dev = torch.device("cuda")
-    torch.cuda.reset_peak_memory_stats(dev)
     runtime = InferenceRuntime.from_key(
         RuntimeKey(
             checkpoint=download_hf_checkpoint("Aratako/Irodori-TTS-v4.1-Small"),
-            model_device="cuda",
+            model_device="mps",
             model_precision=args.precision,
-            codec_device="cuda",
+            codec_device="mps",
             codec_precision=args.codec_precision,
         )
     )
     print(
-        f"[load] peak_alloc={torch.cuda.max_memory_allocated(dev)/MiB:.0f}MiB "
-        f"alloc={torch.cuda.memory_allocated(dev)/MiB:.0f}MiB reserved={torch.cuda.memory_reserved(dev)/MiB:.0f}MiB"
+        f"[load] alloc={torch.mps.current_allocated_memory()/MiB:.0f}MiB "
+        f"driver={torch.mps.driver_allocated_memory()/MiB:.0f}MiB"
     )
 
     stage_peaks: dict[str, float] = {}
+
+    class _Peak:
+        def __init__(self) -> None:
+            self.peak = 0
+            self._stop = threading.Event()
+            self._t = threading.Thread(target=self._loop, daemon=True)
+
+        def _loop(self) -> None:
+            while not self._stop.is_set():
+                self.peak = max(self.peak, torch.mps.current_allocated_memory())
+                self._stop.wait(0.02)
+
+        def __enter__(self):
+            self._t.start()
+            return self
+
+        def __exit__(self, *exc):
+            self._stop.set()
+            self._t.join(timeout=1)
+            self.peak = max(self.peak, torch.mps.current_allocated_memory())
 
     def wrap(obj, name, label):
         fn = getattr(obj, name)
 
         def inner(*a, **k):
-            torch.cuda.synchronize(dev)
-            base = torch.cuda.memory_allocated(dev)
-            torch.cuda.reset_peak_memory_stats(dev)
-            out = fn(*a, **k)
-            torch.cuda.synchronize(dev)
-            stage_peaks[label] = max(
-                stage_peaks.get(label, 0.0), (torch.cuda.max_memory_allocated(dev) - base) / MiB
-            )
+            torch.mps.synchronize()
+            base = torch.mps.current_allocated_memory()
+            with _Peak() as pk:
+                out = fn(*a, **k)
+                torch.mps.synchronize()
+            stage_peaks[label] = max(stage_peaks.get(label, 0.0), (pk.peak - base) / MiB)
             return out
 
         setattr(obj, name, inner)
@@ -81,28 +100,20 @@ def main() -> None:
             no_ref=no_ref,
             seed=1234,
         )
-        runtime.synthesize(req)  # warm (graph capture etc.)
+        runtime.synthesize(req)  # warm (Metal pipeline compilation etc.)
         stage_peaks.clear()
-        torch.cuda.synchronize(dev)
-        torch.cuda.reset_peak_memory_stats(dev)
-        base = torch.cuda.memory_allocated(dev)
-        result = runtime.synthesize(req)
-        torch.cuda.synchronize(dev)
+        torch.mps.synchronize()
+        base = torch.mps.current_allocated_memory()
+        with _Peak() as pk:
+            result = runtime.synthesize(req)
+            torch.mps.synchronize()
         print(
             f"[{name}] audio={result.audio.shape[-1]/result.sample_rate:.2f}s "
-            f"resident={base/MiB:.0f}MiB request_peak_alloc={torch.cuda.max_memory_allocated(dev)/MiB:.0f}MiB "
-            f"reserved={torch.cuda.memory_reserved(dev)/MiB:.0f}MiB"
+            f"resident={base/MiB:.0f}MiB request_peak_alloc={pk.peak/MiB:.0f}MiB "
+            f"driver={torch.mps.driver_allocated_memory()/MiB:.0f}MiB"
         )
         for k, v in stage_peaks.items():
             print(f"    {k}: +{v:.0f}MiB")
-    smi = subprocess.run(
-        ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
-        capture_output=True, text=True,
-    ).stdout.strip()
-    print(f"[smi] memory.used now={smi}MiB (after all requests; includes CUDA context)")
-    if runtime._graph_runner is not None:
-        st = runtime._graph_runner.stats()
-        print(f"[graph] entries={st['entries']} const_sets={st['const_sets']} static={st['static_bytes']/MiB:.0f}MiB")
 
 
 if __name__ == "__main__":

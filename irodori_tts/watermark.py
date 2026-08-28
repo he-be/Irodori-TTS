@@ -31,7 +31,7 @@ class SilentCipherWatermarker:
         self.intentionally_disabled = False
 
     @classmethod
-    def disabled(cls) -> "SilentCipherWatermarker":
+    def disabled(cls) -> SilentCipherWatermarker:
         obj = cls.__new__(cls)
         obj.model = None
         obj.intentionally_disabled = True

@@ -28,18 +28,39 @@ DURATION_ARCHITECTURES = {
 
 
 def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0) -> torch.Tensor:
+    """RoPE table. Complex (S, Dh/2) by default; real (S, Dh/2, 2) = [cos, sin] on the
+    Metal build (see ``apply_rotary_emb``)."""
     freqs = 1.0 / (theta ** (torch.arange(0, dim, 2, dtype=torch.float32) / dim))
     t = torch.arange(end, dtype=torch.float32)
     freqs = torch.outer(t, freqs)
+    if _rope_real_enabled():
+        return torch.stack([torch.cos(freqs), torch.sin(freqs)], dim=-1)
     return torch.complex(torch.cos(freqs), torch.sin(freqs))
 
 
+def _rope_real_enabled() -> bool:
+    from .opt_config import get_opt_config
+
+    return bool(get_opt_config().rope_real)
+
+
 def apply_rotary_emb(x: torch.Tensor, freqs_cis: torch.Tensor) -> torch.Tensor:
-    # x: (B, S, H, Dh), Dh must be even.
-    x_ = torch.view_as_complex(x.float().reshape(*x.shape[:3], -1, 2))
-    x_ = x_ * freqs_cis[None, :, None, :]
-    x_ = torch.view_as_real(x_).reshape_as(x)
-    return x_.type_as(x)
+    # x: (B, S, H, Dh), Dh must be even. Pairs (x[2i], x[2i+1]) are rotated by angle
+    # theta_i * position, exactly the complex product of the reference implementation.
+    if freqs_cis.is_complex():
+        x_ = torch.view_as_complex(x.float().reshape(*x.shape[:3], -1, 2))
+        x_ = x_ * freqs_cis[None, :, None, :]
+        x_ = torch.view_as_real(x_).reshape_as(x)
+        return x_.type_as(x)
+    # Real-valued path: MPS has no complex kernels worth using, and this keeps the
+    # rotation in four fused elementwise ops with no dtype round trip through complex64.
+    xf = x.float().reshape(*x.shape[:3], -1, 2)
+    cos = freqs_cis[None, :, None, :, 0]
+    sin = freqs_cis[None, :, None, :, 1]
+    x_re = xf[..., 0]
+    x_im = xf[..., 1]
+    out = torch.stack([x_re * cos - x_im * sin, x_re * sin + x_im * cos], dim=-1)
+    return out.reshape_as(x).type_as(x)
 
 
 _TIMESTEP_FREQS_CACHE: dict[tuple[str, int | None, int], torch.Tensor] = {}

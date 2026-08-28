@@ -13,3 +13,4 @@
 | 09 | [09-vram-safe-operating-point.md](09-vram-safe-operating-point.md) | 宣言上限入力での stress。参照 encode の chunk 化、CUDA Graph の static/pool 上限化 → **既定を 3072 MB に変更** | 完了（10 が更新） |
 | 10 | [10-vlm-coexistence.md](10-vlm-coexistence.md) | llama-swap の VLM との同居。`--n-cpu-moe` による静的な VRAM 配分、同時実行/ロード churn/パイプライン stress、**上限の既定を 3840 MB に修正** | 完了 |
 | 11 | [11-load-time.md](11-load-time.md) | ロード時間の分解。捨てる乱数初期化の除去、事前計算バンドル（prebake）、import 裏での並列ロード → **9.55 → 5.08 s** | 完了 |
+| 12 | [12-metal-port.md](12-metal-port.md) | **ブランチ `metal-local`**: Apple M3 Pro / Metal (MPS) 専用化。CUDA Graph・VRAM cap 撤去、実数 RoPE、fp16 既定、MPS スレッド制約、compile、warm ベンチ → **short RTF 0.40（compile）/ 0.48（eager）** | 完了 |

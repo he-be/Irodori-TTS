@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import inspect
-import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -128,10 +127,42 @@ class DACVAECodec:
     normalize_db: float | None
 
     @classmethod
+    def prepare_cpu(
+        cls,
+        repo_id: str = "Aratako/Semantic-DACVAE-Japanese-32dim",
+        dtype: torch.dtype | None = None,
+        fold_weight_norm: bool = True,
+        prebaked_state: dict[str, torch.Tensor] | None = None,
+        prebaked_kwargs: dict | None = None,
+    ) -> torch.nn.Module:
+        """CPU-only half of :meth:`load` (unpickle, fold, cast). Safe to run on a worker
+        thread: it never touches the MPS stream, which is not safe to share between
+        threads (Metal asserts with "commit command buffer with uncommitted encoder")."""
+        DACVAE = _import_dacvae()
+        if prebaked_state is not None:
+            # Bundle path: the tensors are already folded and already in the target dtype
+            # (see prebake.py).
+            with skip_random_init(get_opt_config().skip_init):
+                model = DACVAE(**dict(prebaked_kwargs or {}))
+            model = model.eval()
+            if fold_weight_norm:
+                fold_weight_norm_(model)
+            model.load_state_dict(prebaked_state, strict=True, assign=True)
+            return model
+        location = resolve_codec_weights(repo_id)
+        model = _load_dacvae_weights(DACVAE, location).eval()
+        if fold_weight_norm:
+            folded = fold_weight_norm_(model)
+            print(f"[codec] folded weight_norm on {folded} conv layers", flush=True)
+        if dtype is not None:
+            model = model.to(dtype=dtype)
+        return model
+
+    @classmethod
     def load(
         cls,
         repo_id: str = "Aratako/Semantic-DACVAE-Japanese-32dim",
-        device: str = "cuda",
+        device: str = "mps",
         dtype: torch.dtype | None = None,
         deterministic_encode: bool = True,
         deterministic_decode: bool = True,
@@ -139,27 +170,20 @@ class DACVAECodec:
         fold_weight_norm: bool = True,
         prebaked_state: dict[str, torch.Tensor] | None = None,
         prebaked_kwargs: dict | None = None,
+        prepared_model: torch.nn.Module | None = None,
     ) -> DACVAECodec:
-        DACVAE = _import_dacvae()
-
-        if prebaked_state is not None:
-            # Bundle path: the tensors are already folded, already in the target
-            # dtype and already on the target device (see prebake.py).
-            with skip_random_init(get_opt_config().skip_init):
-                model = DACVAE(**dict(prebaked_kwargs or {}))
-            model = model.eval()
-            if fold_weight_norm:
-                fold_weight_norm_(model)
-            model.load_state_dict(prebaked_state, strict=True, assign=True)
-            model = model.to(device)
-        else:
-            location = resolve_codec_weights(repo_id)
-            model = _load_dacvae_weights(DACVAE, location).eval().to(device)
-            if fold_weight_norm:
-                folded = fold_weight_norm_(model)
-                print(f"[codec] folded weight_norm on {folded} conv layers", flush=True)
-            if dtype is not None:
-                model = model.to(dtype=dtype)
+        """Build the codec on ``device``. Must be called from the thread that owns the
+        MPS stream (the main thread); ``prepared_model`` lets the CPU work be done
+        elsewhere first (see :meth:`prepare_cpu`)."""
+        if prepared_model is None:
+            prepared_model = cls.prepare_cpu(
+                repo_id=repo_id,
+                dtype=dtype,
+                fold_weight_norm=fold_weight_norm,
+                prebaked_state=prebaked_state,
+                prebaked_kwargs=prebaked_kwargs,
+            )
+        model = prepared_model.to(device)
 
         decoder = getattr(model, "decoder", None)
         if decoder is not None and hasattr(decoder, "alpha"):
@@ -182,10 +206,8 @@ class DACVAECodec:
 
         model_dtype = next(model.parameters()).dtype
         # Infer latent dimension by encoding a tiny random signal.
-        # This probe is load-bearing beyond the shape it reports: it is the first
-        # conv on this device, and it fixes the cuDNN algorithm choice for the
-        # encoder. Taking the latent dim from a manifest and skipping the probe
-        # changes every later encode bit-for-bit (see 11-load-time.md).
+        # The probe also compiles/caches the Metal conv pipelines for the encoder so
+        # the first real request does not pay for it.
         dummy = torch.zeros(1, 1, 2048, device=device, dtype=model_dtype)
         with torch.inference_mode():
             z = model.encode(dummy)  # (B, D, T)
@@ -357,7 +379,7 @@ class DACVAECodec:
             encoded = self._encode_window(waveform)
             return encoded.transpose(1, 2).contiguous()  # (B, T, D)
 
-        # Fixed-size windows (repeating shapes for cuDNN); a short remainder is merged
+        # Fixed-size windows (repeating shapes for the MPS graph cache); a short remainder is merged
         # into the previous window instead of being encoded as a tiny chunk.
         bounds: list[tuple[int, int]] = []
         start = 0
@@ -385,7 +407,7 @@ class DACVAECodec:
         *,
         chunk_frames: int | None = None,
         overlap_frames: int = 64,
-        autocast_bf16: bool = False,
+        autocast_dtype: torch.dtype | None = None,
     ) -> torch.Tensor:
         """
         Input:
@@ -403,10 +425,10 @@ class DACVAECodec:
             raise ValueError(f"Expected latent ndim=3, got shape={tuple(latent.shape)}")
         z = latent.transpose(1, 2).contiguous().to(self.device, dtype=self.dtype)  # (B, D, T)
         total = int(z.shape[-1])
-        if autocast_bf16 and self.device.type == "cuda" and self.dtype == torch.float32:
+        if autocast_dtype is not None and self.dtype == torch.float32:
             # Decode-only reduced precision: weights stay fp32 (so reference *encode* is
-            # unchanged); convs run in bf16 and activations are half the size.
-            with torch.autocast("cuda", dtype=torch.bfloat16):
+            # unchanged); convs run in fp16/bf16 and activations are half the size.
+            with torch.autocast("mps", dtype=autocast_dtype):
                 out = self.decode_latent(
                     latent, chunk_frames=chunk_frames, overlap_frames=overlap_frames
                 )
@@ -415,7 +437,7 @@ class DACVAECodec:
             return self.model.decode(z)
         hop = int(self.model.hop_length)
         pieces: list[torch.Tensor] = []
-        # Fixed-size windows (so cuDNN sees repeating shapes); a short remainder is merged
+        # Fixed-size windows (repeating shapes for the MPS graph cache); a short remainder is merged
         # into the previous window instead of being decoded as a tiny chunk.
         bounds: list[tuple[int, int]] = []
         start = 0

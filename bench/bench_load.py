@@ -2,8 +2,8 @@
 """Load / unload profiler for the inference runtime (experiment 11).
 
 Runs the load in a *fresh subprocess* so that "load" means what it means in
-practice: python import, CUDA context creation, checkpoint read, model
-construction and the move to the GPU.  Per-phase timings come from
+practice: python import, Metal device init, checkpoint read, model
+construction and the move to the MPS device.  Per-phase timings come from
 ``IRODORI_OPT_LOAD_TRACE=1`` inside ``inference_runtime``.
 
     uv run --no-sync python bench/bench_load.py --repeats 3 --tag baseline \
@@ -38,8 +38,8 @@ from irodori_tts.inference_runtime import (
 t_import_pkg = time.perf_counter() - t0
 
 t0 = time.perf_counter()
-torch.cuda.init()
-torch.cuda.synchronize()
+torch.zeros(1, device="mps")
+torch.mps.synchronize()
 t_cuda_init = time.perf_counter() - t0
 
 checkpoint = os.environ.get("BENCH_LOAD_CKPT") or download_hf_checkpoint(
@@ -50,30 +50,20 @@ t0 = time.perf_counter()
 runtime = InferenceRuntime.from_key(
     RuntimeKey(
         checkpoint=checkpoint,
-        model_device="cuda",
-        model_precision=os.environ.get("BENCH_LOAD_PRECISION", "bf16"),
-        codec_device="cuda",
+        model_device="mps",
+        model_precision=os.environ.get("BENCH_LOAD_PRECISION", "fp16"),
+        codec_device="mps",
         codec_precision="fp32",
     )
 )
-torch.cuda.synchronize()
+torch.mps.synchronize()
 t_from_key = time.perf_counter() - t0
 
 def smi():
-    out = subprocess_check(["nvidia-smi", "--query-compute-apps=pid,used_memory",
-                            "--format=csv,noheader,nounits"])
-    mine = os.getpid()
-    for line in out.splitlines():
-        parts = [p.strip() for p in line.split(",")]
-        if len(parts) == 2 and int(parts[0]) == mine:
-            return float(parts[1])
-    return 0.0
+    return torch.mps.driver_allocated_memory() / 2**20
 
-import subprocess as _sp
-def subprocess_check(cmd):
-    return _sp.run(cmd, capture_output=True, text=True).stdout
-
-rss = float(open("/proc/self/statm").read().split()[1]) * os.sysconf("SC_PAGE_SIZE") / 2**20
+import resource
+rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20  # bytes on macOS
 
 result = {
     "t_import_torch": t_import_torch,
@@ -82,8 +72,8 @@ result = {
     "t_from_key": t_from_key,
     "t_process_to_loaded": time.monotonic() - t_proc,
     "phases": [{"name": n, "seconds": v} for n, v in get_load_trace()],
-    "alloc_mib": torch.cuda.memory_allocated() / 2**20,
-    "reserved_mib": torch.cuda.memory_reserved() / 2**20,
+    "alloc_mib": torch.mps.current_allocated_memory() / 2**20,
+    "reserved_mib": torch.mps.driver_allocated_memory() / 2**20,
     "smi_loaded_mib": smi(),
     "rss_mib": rss,
 }
@@ -96,7 +86,7 @@ if os.environ.get("BENCH_LOAD_SYNTH", "0") == "1":
         ref_wav=str(os.environ.get("BENCH_LOAD_REF")),
         num_steps=40, seed=0,
     ))
-    torch.cuda.synchronize()
+    torch.mps.synchronize()
     result["t_first_synth"] = time.perf_counter() - t0
     result["smi_after_synth_mib"] = smi()
 
@@ -105,10 +95,10 @@ runtime.unload()
 del runtime
 import gc
 gc.collect()
-torch.cuda.empty_cache()
-torch.cuda.synchronize()
+torch.mps.empty_cache()
+torch.mps.synchronize()
 result["t_unload"] = time.perf_counter() - t0
-result["reserved_after_unload_mib"] = torch.cuda.memory_reserved() / 2**20
+result["reserved_after_unload_mib"] = torch.mps.driver_allocated_memory() / 2**20
 result["smi_after_unload_mib"] = smi()
 
 if os.environ.get("BENCH_LOAD_RELOAD", "0") == "1":
@@ -120,13 +110,13 @@ if os.environ.get("BENCH_LOAD_RELOAD", "0") == "1":
     runtime = InferenceRuntime.from_key(
         RuntimeKey(
             checkpoint=checkpoint,
-            model_device="cuda",
-            model_precision=os.environ.get("BENCH_LOAD_PRECISION", "bf16"),
-            codec_device="cuda",
+            model_device="mps",
+            model_precision=os.environ.get("BENCH_LOAD_PRECISION", "fp16"),
+            codec_device="mps",
             codec_precision="fp32",
         )
     )
-    torch.cuda.synchronize()
+    torch.mps.synchronize()
     result["t_second_load"] = time.perf_counter() - t0
     result["phases_second"] = [{"name": n, "seconds": v} for n, v in get_load_trace()]
     runtime.unload()
@@ -164,14 +154,14 @@ def main() -> None:
     ap.add_argument("--tag", default="load")
     ap.add_argument("--checkpoint", default=None, help="local .safetensors (overrides --hf)")
     ap.add_argument("--hf", default="Aratako/Irodori-TTS-v4.1-Small")
-    ap.add_argument("--precision", default="bf16")
+    ap.add_argument("--precision", default="fp16")
     ap.add_argument("--synth", action="store_true", help="also time the first synthesize()")
     ap.add_argument("--reload", action="store_true", help="also time a second in-process load")
     ap.add_argument("--ref", default=str(REPO_ROOT / "outputs" / "sample.wav"))
     ap.add_argument(
         "--drop-caches",
         action="store_true",
-        help="echo 3 > /proc/sys/vm/drop_caches before each run (needs sudo)",
+        help="run `sudo purge` before each run (drops the file cache)",
     )
     ap.add_argument("--env", action="append", default=[], metavar="K=V")
     ap.add_argument("--output", default=None)
@@ -190,21 +180,19 @@ def main() -> None:
     runs = []
     for i in range(args.repeats):
         if args.drop_caches:
-            subprocess.run(
-                ["sudo", "sh", "-c", "sync; echo 3 > /proc/sys/vm/drop_caches"], check=False
-            )
+            subprocess.run(["sudo", "purge"], check=False)
         run = run_once(env_extra, synth=args.synth, ref=args.ref, reload_twice=args.reload)
         runs.append(run)
         phases = " ".join(f"{p['name']}={p['seconds']:.2f}" for p in run["phases"])
         print(
             f"[{i}] proc->loaded {run['t_process_to_loaded']:.2f}s "
             f"(torch {run['t_import_torch']:.2f} pkg {run['t_import_pkg']:.2f} "
-            f"cuda {run['t_cuda_init']:.2f} from_key {run['t_from_key']:.2f}) | {phases}",
+            f"mps {run['t_cuda_init']:.2f} from_key {run['t_from_key']:.2f}) | {phases}",
             flush=True,
         )
         print(
-            f"     smi {run['smi_loaded_mib']:.0f} MiB | rss {run['rss_mib']:.0f} MiB | "
-            f"unload {run['t_unload']:.2f}s -> smi {run['smi_after_unload_mib']:.0f} MiB",
+            f"     driver {run['smi_loaded_mib']:.0f} MiB | rss {run['rss_mib']:.0f} MiB | "
+            f"unload {run['t_unload']:.2f}s -> driver {run['smi_after_unload_mib']:.0f} MiB",
             flush=True,
         )
 

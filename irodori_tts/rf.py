@@ -10,11 +10,8 @@ from .speaker_inversion import SPEAKER_INVERSION_UNCOND_MODES
 
 
 def _make_rng(seed: int, device: torch.device) -> tuple[torch.Generator, torch.device]:
-    # MPS generators are not available on some PyTorch builds; use CPU generator as fallback.
-    try:
-        return torch.Generator(device=device).manual_seed(seed), device
-    except RuntimeError:
-        return torch.Generator(device="cpu").manual_seed(seed), torch.device("cpu")
+    # Metal-only build: the noise is drawn on the MPS device itself (no CPU fallback).
+    return torch.Generator(device=device).manual_seed(seed), device
 
 
 def sample_logit_normal_t(
@@ -588,7 +585,7 @@ def _sample_euler_rf_cfg_legacy(
 # ---------------------------------------------------------------------------
 # Fast path (single-machine optimization): no per-step host<->device syncs,
 # precomputed additive attention masks, optional condition reuse, and a
-# self-contained per-step function that can be captured by a CUDA Graph runner.
+# self-contained per-step function (one Metal command stream per step).
 # ---------------------------------------------------------------------------
 
 _Bundle = tuple[
@@ -683,7 +680,6 @@ class _FastSamplerState:
         self.latent_mask = latent_mask
         self.masks: dict[str, torch.Tensor | None] = {}
 
-    # -- CUDA Graph support -------------------------------------------------
     def required_mask_names(self, *, use_cfg: bool, alt_index: int) -> list[tuple[str, _Bundle, bool]]:
         mode = self.cfg_guidance_mode
         if use_cfg and self.enabled_cfg_names:
@@ -709,58 +705,6 @@ class _FastSamplerState:
     def prepare_masks(self, *, use_cfg: bool, alt_index: int) -> None:
         for name, bundle, has_kv in self.required_mask_names(use_cfg=use_cfg, alt_index=alt_index):
             self.mask_for(name, bundle, has_kv)
-
-    def const_tree(self) -> dict[str, object]:
-        return {
-            "cond_bundle": self.cond_bundle,
-            "independent_bundle": self.independent_bundle,
-            "joint_bundle": self.joint_bundle,
-            "alternating_bundles": self.alternating_bundles,
-            "context_kv": {
-                "cond": self.context_kv_cond,
-                "cfg": self.context_kv_cfg,
-                "joint": self.context_kv_joint,
-                "alternating": self.context_kv_alternating,
-            },
-            "masks": self.masks,
-            "latent_mask": self.latent_mask,
-        }
-
-    def rebind(self, tree: dict[str, object]) -> "_FastSamplerState":
-        kv = tree["context_kv"]
-        clone = _FastSamplerState(
-            model=self.model,
-            cond_bundle=tree["cond_bundle"],  # type: ignore[arg-type]
-            context_kv_cond=kv["cond"],  # type: ignore[index]
-            cfg_batch_mult=self.cfg_batch_mult,
-            independent_bundle=tree["independent_bundle"],  # type: ignore[arg-type]
-            context_kv_cfg=kv["cfg"],  # type: ignore[index]
-            independent_names=self.independent_names,
-            joint_bundle=tree["joint_bundle"],  # type: ignore[arg-type]
-            context_kv_joint=kv["joint"],  # type: ignore[index]
-            alternating_bundles=tree["alternating_bundles"],  # type: ignore[arg-type]
-            context_kv_alternating=kv["alternating"],  # type: ignore[index]
-            enabled_cfg_names=self.enabled_cfg_names,
-            cfg_scales=self.cfg_scales,
-            cfg_guidance_mode=self.cfg_guidance_mode,
-            rescale_k=self.rescale_k,
-            rescale_sigma=self.rescale_sigma,
-            latent_len=self.latent_len,
-            latent_mask=tree["latent_mask"],  # type: ignore[arg-type]
-        )
-        clone.masks = dict(tree["masks"])  # type: ignore[arg-type]
-        return clone
-
-    def python_signature(self) -> tuple:
-        return (
-            self.cfg_guidance_mode,
-            tuple(self.enabled_cfg_names),
-            tuple(sorted(self.cfg_scales.items())),
-            self.cfg_batch_mult,
-            self.rescale_k,
-            self.rescale_sigma,
-            self.latent_len,
-        )
 
     def mask_for(self, name: str, bundle: _Bundle, has_kv: bool) -> torch.Tensor | None:
         if not has_kv:
@@ -903,8 +847,6 @@ def _sample_euler_rf_cfg_fast(
     sway_coeff: float = -1.0,
     encoded_conditions: _Bundle | None = None,
     has_caption: bool | None = None,
-    graph_runner: object | None = None,
-    graph_bucket: int = 1,
 ) -> torch.Tensor:
     device = model.device
     dtype = model.dtype
@@ -959,7 +901,7 @@ def _sample_euler_rf_cfg_fast(
         )
     t_schedule = (1.0 - u) * init_scale
     t_list: list[float] = t_schedule.tolist()
-    if any(a <= b for a, b in zip(t_list[:-1], t_list[1:])):
+    if any(a <= b for a, b in zip(t_list[:-1], t_list[1:], strict=False)):
         raise ValueError("t_schedule must be strictly decreasing; adjust num_steps or sway_coeff.")
     dt_schedule = t_schedule[1:] - t_schedule[:-1]  # (num_steps,), fp32 on device
     t_model = t_schedule.to(dtype=dtype)  # bf16/fp32 view of t for the model
@@ -1127,22 +1069,6 @@ def _sample_euler_rf_cfg_fast(
             )
     speaker_kv_active = speaker_kv_scale is not None
 
-    # Optional latent-length bucketing for CUDA Graph reuse: pad the latent sequence to
-    # a multiple of ``graph_bucket`` and mask the padded self tokens. Padded positions
-    # are never attended by real tokens and their outputs are discarded.
-    real_len = int(sequence_length)
-    padded_len = real_len
-    latent_mask = None
-    if graph_runner is not None and graph_bucket > 1:
-        padded_len = int(math.ceil(real_len / graph_bucket) * graph_bucket)
-        if padded_len != real_len:
-            latent_mask = torch.zeros((batch_size, padded_len), dtype=torch.bool, device=device)
-            latent_mask[:, :real_len] = True
-            x_t = torch.cat(
-                [x_t, torch.zeros((batch_size, padded_len - real_len, latent_dim), device=device, dtype=dtype)],
-                dim=1,
-            )
-
     state = _FastSamplerState(
         model=model,
         cond_bundle=cond_bundle,
@@ -1160,38 +1086,23 @@ def _sample_euler_rf_cfg_fast(
         cfg_guidance_mode=cfg_guidance_mode,
         rescale_k=rescale_k,
         rescale_sigma=rescale_sigma,
-        latent_len=padded_len,
-        latent_mask=latent_mask,
+        latent_len=int(sequence_length),
+        latent_mask=None,
     )
 
-    # Precompute every attention mask this request can use so the constant set seen by
-    # the graph runner has a stable layout from the first step on.
+    # Precompute every attention mask this request can use up-front (one allocation
+    # per mask instead of one per step).
     state.prepare_masks(use_cfg=False, alt_index=0)
     if enabled_cfg_names:
         for alt_index in range(len(enabled_cfg_names) if use_alternating_cfg else 1):
             state.prepare_masks(use_cfg=True, alt_index=alt_index)
-
-    runner = graph_runner
-    if runner is not None:
-        runner.begin_request()  # type: ignore[attr-defined]
 
     for i in range(num_steps):
         t = t_list[i]
         tt = t_model[i : i + 1].expand(batch_size)
         dt = dt_schedule[i : i + 1]
         use_cfg = bool(enabled_cfg_names) and (cfg_min_t <= t <= cfg_max_t)
-        alt_index = i % len(enabled_cfg_names) if (use_alternating_cfg and enabled_cfg_names) else 0
-        if runner is not None:
-            x_t = runner.run_step(  # type: ignore[attr-defined]
-                state,
-                x_t=x_t,
-                tt=tt,
-                dt=dt,
-                use_cfg=use_cfg,
-                alt_index=alt_index,
-            )
-        else:
-            x_t = state.step(x_t, tt, dt, use_cfg=use_cfg, step_index=i)
+        x_t = state.step(x_t, tt, dt, use_cfg=use_cfg, step_index=i)
 
         t_next = t_list[i + 1]
         if (
@@ -1208,11 +1119,7 @@ def _sample_euler_rf_cfg_fast(
                     max_layers=speaker_kv_max_layers,
                 )
             speaker_kv_active = False
-            if runner is not None:
-                runner.mark_dirty("context_kv")  # type: ignore[attr-defined]
 
-    if padded_len != real_len:
-        x_t = x_t[:, :real_len]
     return x_t
 
 
@@ -1221,8 +1128,6 @@ def sample_euler_rf_cfg(
     *args: object,
     encoded_conditions: _Bundle | None = None,
     has_caption: bool | None = None,
-    graph_runner: object | None = None,
-    graph_bucket: int = 1,
     opt: OptConfig | None = None,
     **kwargs: object,
 ) -> torch.Tensor:
@@ -1234,8 +1139,6 @@ def sample_euler_rf_cfg(
             *args,  # type: ignore[arg-type]
             encoded_conditions=encoded_conditions,
             has_caption=has_caption,
-            graph_runner=graph_runner if opt.cuda_graph else None,
-            graph_bucket=graph_bucket,
             **kwargs,  # type: ignore[arg-type]
         )
     return _sample_euler_rf_cfg_legacy(model, *args, **kwargs)  # type: ignore[arg-type]

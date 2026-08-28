@@ -34,9 +34,9 @@ def run_set(out_dir: Path, name: str, precision: str, codec_precision: str, cfg:
     runtime = InferenceRuntime.from_key(
         RuntimeKey(
             checkpoint=download_hf_checkpoint("Aratako/Irodori-TTS-v4.1-Small"),
-            model_device="cuda",
+            model_device="mps",
             model_precision=precision,
-            codec_device="cuda",
+            codec_device="mps",
             codec_precision=codec_precision,
         )
     )

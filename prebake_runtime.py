@@ -3,9 +3,9 @@
 
 A cold load spends most of its time redoing work that only depends on the
 checkpoint: building the module, copying 714 FP32 tensors in, casting them to
-BF16, unpickling the codec and folding its weight_norm hooks.  This tool does
-that once and writes the finished tensors next to a manifest; later loads mmap
-them straight onto the GPU.  See docs/experiments/11-load-time.md.
+the runtime dtype, unpickling the codec and folding its weight_norm hooks.  This
+tool does that once and writes the finished tensors next to a manifest; later
+loads mmap them straight onto the MPS device.  See docs/experiments/11-load-time.md.
 
     uv run --no-sync python prebake_runtime.py --hf-checkpoint Aratako/Irodori-TTS-v4.1-Small
 
@@ -44,9 +44,9 @@ def main() -> None:
         "--hf-checkpoint", default=None, help="Hugging Face repo id (or repo/subfolder)."
     )
     ap.add_argument("--model-device", default=default_runtime_device())
-    ap.add_argument("--model-precision", default="bf16", choices=["fp32", "bf16"])
+    ap.add_argument("--model-precision", default="fp16", choices=["fp32", "fp16", "bf16"])
     ap.add_argument("--codec-device", default=None, help="Defaults to --model-device.")
-    ap.add_argument("--codec-precision", default="fp32", choices=["fp32", "bf16"])
+    ap.add_argument("--codec-precision", default="fp32", choices=["fp32", "fp16", "bf16"])
     ap.add_argument("--codec-repo", default="Aratako/Semantic-DACVAE-Japanese-32dim")
     ap.add_argument(
         "--root", default=None, help="Bundle cache root (default: ~/.cache/irodori-tts/prebake)."

@@ -30,10 +30,10 @@ LEGACY = OptConfig(
     reuse_conditions=False,
     crop_text=False,
     fast_sampler=False,
-    cuda_graph=False,
     codec_fold_weight_norm=False,
     reference_cache=False,
     cpu_cast=False,
+    rope_real=False,
 )
 
 
@@ -43,7 +43,7 @@ def _hash(audio: torch.Tensor) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--precision", default="bf16")
+    parser.add_argument("--precision", default="fp32")
     parser.add_argument("--inputs", nargs="+", default=["short", "caption_noref"])
     parser.add_argument("--modes", nargs="+", default=["independent", "joint", "alternating"])
     parser.add_argument("--num-steps", type=int, default=40)
@@ -51,28 +51,26 @@ def main() -> None:
     parser.add_argument(
         "--variants",
         nargs="+",
-        default=["fast_nograph", "fast_graph"],
+        default=["fast", "rope_complex"],
         help="Which optimized variants to compare against legacy.",
     )
     args = parser.parse_args()
 
     variants: dict[str, OptConfig] = {
-        "fast_nograph": OptConfig(cuda_graph=False),
-        "fast_graph": OptConfig.from_env(),
-        "crop_only": OptConfig(fast_sampler=False, cuda_graph=False, reuse_conditions=False),
-        "reuse_only": OptConfig(fast_sampler=False, cuda_graph=False, crop_text=False),
-        "sampler_only": OptConfig(crop_text=False, cuda_graph=False, reuse_conditions=False),
+        "fast": OptConfig.from_env(),
+        "rope_complex": OptConfig(rope_real=False),
+        "crop_only": OptConfig(fast_sampler=False, reuse_conditions=False),
+        "reuse_only": OptConfig(fast_sampler=False, crop_text=False),
+        "sampler_only": OptConfig(crop_text=False, reuse_conditions=False),
     }
 
-    # Build the runtime with graphs enabled so the runner exists; individual variants
-    # toggle the switches afterwards.
     set_opt_config(OptConfig.from_env())  # honors IRODORI_OPT_* (e.g. COMPILE_DIT=1)
     runtime = InferenceRuntime.from_key(
         RuntimeKey(
             checkpoint=download_hf_checkpoint("Aratako/Irodori-TTS-v4.1-Small"),
-            model_device="cuda",
+            model_device="mps",
             model_precision=args.precision,
-            codec_device="cuda",
+            codec_device="mps",
             codec_precision="fp32",
         )
     )
@@ -82,6 +80,10 @@ def main() -> None:
 
     def run(name: str, mode: str, cfg: OptConfig) -> torch.Tensor:
         set_opt_config(cfg)
+        # RoPE tables are cached per module; drop them so the variant's layout is rebuilt.
+        for mod in runtime.model.modules():
+            if "_freqs_cis_cache" in mod._buffers:
+                mod._buffers["_freqs_cis_cache"] = torch.empty(0, 0, device=runtime.model_device)
         # Legacy reference always uses the uncompiled forward.
         runtime.model.forward_with_encoded_conditions = (
             eager_forward if cfg is LEGACY else compiled_forward
@@ -111,7 +113,7 @@ def main() -> None:
             h_ref = _hash(ref)
             for vname in args.variants:
                 cfg = variants[vname]
-                # run twice: first may capture graphs, second replays
+                # run twice: the second run has every Metal pipeline cached
                 t0 = time.perf_counter()
                 out = run(name, mode, cfg)
                 t1 = time.perf_counter()
@@ -129,8 +131,6 @@ def main() -> None:
                     f"[{name}/{mode}/{vname}] {status} len_eq={same_len} "
                     f"repeat_maxdiff={diff2:.1e} t1={1000*(t1-t0):.0f}ms t2={1000*(t2-t1):.0f}ms"
                 )
-    if runtime._graph_runner is not None:
-        print("graph stats:", runtime._graph_runner.stats())
     print("RESULT:", "OK" if all_ok else "MISMATCH")
 
 

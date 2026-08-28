@@ -92,22 +92,22 @@ def main() -> None:
     parser.add_argument(
         "--model-device",
         default=default_runtime_device(),
-        help="Model inference device (e.g. cuda, mps, cpu).",
+        help="Model inference device (this build: mps only).",
     )
     parser.add_argument(
         "--model-precision",
-        choices=["fp32", "bf16"],
-        default="bf16",
-        help="Model precision for weights/compute (local default: bf16).",
+        choices=["fp32", "fp16", "bf16"],
+        default="fp16",
+        help="Model precision for weights/compute (local default: fp16).",
     )
     parser.add_argument(
         "--codec-device",
         default=default_runtime_device(),
-        help="Codec device for reference encode/decode (e.g. cuda, mps, cpu).",
+        help="Codec device for reference encode/decode (this build: mps only).",
     )
     parser.add_argument(
         "--codec-precision",
-        choices=["fp32", "bf16"],
+        choices=["fp32", "fp16", "bf16"],
         default="fp32",
         help="Codec precision for weights/compute.",
     )

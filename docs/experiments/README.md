@@ -3,6 +3,10 @@
 このディレクトリは **このPC・この環境専用** の推論最適化実験の記録である。
 移植性は考慮しない（他環境での再現は保証しない）。
 
+> **ブランチ注記 (`metal-local`)**: 01〜11 は RTX 5060 Ti 機での記録（`main` の履歴として
+> 凍結）。この Mac (M3 Pro / Metal) での作業は [12-metal-port.md](12-metal-port.md) 以降。
+> 12 以降の計測は `bench/bench_runtime.py`（MPS 版）で取り、結果 JSON は `results/metal_*.json`。
+
 ## 前提・制約
 
 | 項目 | 値 |
