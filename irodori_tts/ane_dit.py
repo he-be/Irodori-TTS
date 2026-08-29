@@ -704,6 +704,7 @@ class AneStepRunner:
     def reset_stats(self) -> dict:
         out = dict(self.stats)
         self.stats = {"steps": 0, "predict_sec": 0.0, "wait_sec": 0.0, "ctx": 0}
+        self.last_stats = out
         return out
 
     # -- lifecycle
@@ -754,6 +755,16 @@ def get_ane_runner(model: TextToLatentRFDiT, opt) -> AneStepRunner | None:  # no
         )
         _RUNNERS[id(model)] = runner
     return runner
+
+
+def last_ane_stats(model: TextToLatentRFDiT) -> dict | None:
+    """Stats of the most recent request on ``model`` (None before the first one).
+
+    The sampler falls back to MPS for shapes outside the enumerated packages, so callers
+    surface ``ane_active`` to say which path a request actually took (13-ane.md 3-1).
+    """
+    runner = _RUNNERS.get(id(model))
+    return None if runner is None else getattr(runner, "last_stats", None)
 
 
 def shutdown_ane_runner(model: TextToLatentRFDiT | None = None) -> None:

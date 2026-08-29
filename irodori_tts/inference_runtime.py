@@ -1886,6 +1886,21 @@ class InferenceRuntime:
             stage_sec = _measure_end(self.model_device, t0)
             stage_timings.append(("sample_rf", stage_sec))
             _log(f"[runtime] sample_rf: {stage_sec * 1000.0:.1f} ms")
+            if opt.ane:
+                # Shapes outside the enumerated Core ML packages fall back to MPS per request
+                # (13-ane.md 3-1), so report which path this request actually took.
+                from .ane_dit import last_ane_stats
+
+                ane_stats = last_ane_stats(self.model)
+                if ane_stats is not None:
+                    messages.append(
+                        "info: rf step on {} (steps={}, predict={:.0f} ms, gpu_branches={}).".format(
+                            "ANE + GPU" if ane_stats.get("ane_active") else "MPS (ANE fallback)",
+                            ane_stats.get("steps", 0),
+                            float(ane_stats.get("predict_sec", 0.0)) * 1000.0,
+                            ane_stats.get("gpu_branches", 0),
+                        )
+                    )
 
             t0 = _measure_start(self.model_device)
             z = unpatchify_latent(

@@ -78,8 +78,14 @@ Differences from `main` that matter for inference:
   pays ~20 s, every later one is ~17% faster. The CLI leaves it off because the compile
   cache does not survive the process. Measured on the M3 Pro: short utterance (7.2 s)
   in 2.9 s with compile / 3.5 s without (RTF 0.40 / 0.48).
+- The RF step runs on the **Neural Engine** with the cond CFG branch on the GPU when the
+  Core ML packages are built (`bench/build_ane.py --shapes full`); both Gradio apps enable
+  this by default (1.50x over MPS eager on the M3 Pro). See `docs/experiments/13-ane.md`.
 - Training (`train.py`) is untouched and still CUDA-oriented; it is not exercised on
   this branch.
+
+Japanese operating notes for the Gradio apps on this branch (startup, first-request costs,
+reference cache, ANE fallback conditions): [`docs/mac-gradio.md`](docs/mac-gradio.md).
 
 ## Quick Start
 

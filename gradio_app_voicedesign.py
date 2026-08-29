@@ -16,6 +16,7 @@ _os.environ.setdefault("IRODORI_OPT_ANE_GPU_BRANCHES", "1")
 _os.environ.setdefault("IRODORI_OPT_ANE_SHAPES", "full")
 
 import argparse
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -26,11 +27,8 @@ from irodori_tts.inference_runtime import (
     RuntimeKey,
     SamplingRequest,
     clear_cached_runtime,
-    default_runtime_device,
     download_hf_checkpoint,
     get_cached_runtime,
-    list_available_runtime_devices,
-    list_available_runtime_precisions,
     save_wav,
 )
 from irodori_tts.speaker_inversion import is_speaker_inversion_safetensors_path
@@ -62,26 +60,16 @@ def _default_checkpoint() -> str:
     return "Aratako/Irodori-TTS-v4.1-Small"
 
 
-def _default_model_device() -> str:
-    return default_runtime_device()
-
-
-def _default_codec_device() -> str:
-    return default_runtime_device()
-
-
-def _precision_choices_for_device(device: str) -> list[str]:
-    return list_available_runtime_precisions(device)
-
-
-def _on_model_device_change(device: str) -> gr.Dropdown:
-    choices = _precision_choices_for_device(device)
-    return gr.Dropdown(choices=choices, value=choices[0])
-
-
-def _on_codec_device_change(device: str) -> gr.Dropdown:
-    choices = _precision_choices_for_device(device)
-    return gr.Dropdown(choices=choices, value=choices[0])
+# One backend only: RF step on the Neural Engine with the cond CFG branch on the GPU, the rest
+# on MPS fp16 (13-ane.md). mps is the only torch device and fp16 the only precision worth using
+# (12-metal-port.md 5-6), so there is nothing to pick.
+MODEL_DEVICE = "mps"
+MODEL_PRECISION = "fp16"
+CODEC_DEVICE = "mps"
+CODEC_PRECISION = "fp16"
+BACKEND_LABEL = (
+    "backend: RF step on ANE (Core ML) + cond CFG branch on GPU / encoders + codec on MPS fp16"
+)
 
 
 def _on_t_schedule_mode_change(mode: str) -> object:
@@ -121,11 +109,19 @@ def _parse_optional_str(raw: str | None) -> str | None:
     return text
 
 
-def _format_timings(stage_timings: list[tuple[str, float]], total_to_decode: float) -> str:
+def _format_timings(
+    stage_timings: list[tuple[str, float]],
+    total_to_decode: float,
+    wall_sec: float,
+    audio_sec: float,
+) -> str:
+    # RTF = wall / audio seconds, the number docs/experiments/13-ane.md reports.
+    rtf = wall_sec / audio_sec if audio_sec > 0 else float("nan")
     lines = [
         "[timing] ---- request ----",
         *[f"[timing] {name}: {sec * 1000.0:.1f} ms" for name, sec in stage_timings],
         f"[timing] total_to_decode: {total_to_decode:.3f} s",
+        f"[timing] wall: {wall_sec:.3f} s  audio: {audio_sec:.2f} s  RTF: {rtf:.3f}",
     ]
     return "\n".join(lines)
 
@@ -173,40 +169,22 @@ def _resolve_checkpoint_path(raw_checkpoint: str) -> str:
     return str(resolved)
 
 
-def _build_runtime_key(
-    checkpoint: str,
-    model_device: str,
-    model_precision: str,
-    codec_device: str,
-    codec_precision: str,
-) -> RuntimeKey:
+def _build_runtime_key(checkpoint: str) -> RuntimeKey:
     checkpoint_path = _resolve_checkpoint_path(checkpoint)
     return RuntimeKey(
         checkpoint=checkpoint_path,
-        model_device=str(model_device),
+        model_device=MODEL_DEVICE,
         codec_repo="Aratako/Semantic-DACVAE-Japanese-32dim",
-        model_precision=str(model_precision),
-        codec_device=str(codec_device),
-        codec_precision=str(codec_precision),
+        model_precision=MODEL_PRECISION,
+        codec_device=CODEC_DEVICE,
+        codec_precision=CODEC_PRECISION,
         compile_model=False,
         compile_dynamic=False,
     )
 
 
-def _describe_runtime(
-    checkpoint: str,
-    model_device: str,
-    model_precision: str,
-    codec_device: str,
-    codec_precision: str,
-) -> str:
-    runtime_key = _build_runtime_key(
-        checkpoint=checkpoint,
-        model_device=model_device,
-        model_precision=model_precision,
-        codec_device=codec_device,
-        codec_precision=codec_precision,
-    )
+def _describe_runtime(checkpoint: str) -> str:
+    runtime_key = _build_runtime_key(checkpoint)
     runtime, reloaded = get_cached_runtime(runtime_key)
     status = (
         "loaded model into memory" if reloaded else "model already loaded; reused existing runtime"
@@ -238,10 +216,6 @@ def _describe_runtime(
 
 def _run_generation(
     checkpoint: str,
-    model_device: str,
-    model_precision: str,
-    codec_device: str,
-    codec_precision: str,
     text: str,
     caption: str,
     ref_wavs: object,
@@ -271,13 +245,7 @@ def _run_generation(
     def stdout_log(msg: str) -> None:
         print(msg, flush=True)
 
-    runtime_key = _build_runtime_key(
-        checkpoint=checkpoint,
-        model_device=model_device,
-        model_precision=model_precision,
-        codec_device=codec_device,
-        codec_precision=codec_precision,
-    )
+    runtime_key = _build_runtime_key(checkpoint)
 
     text_value = "" if text is None else str(text).strip()
     caption_value = "" if caption is None else str(caption).strip()
@@ -316,13 +284,9 @@ def _run_generation(
     stdout_log(f"[gradio-caption] runtime: {'reloaded' if reloaded else 'reused'}")
     stdout_log(
         (
-            "[gradio-caption] request: model_device={} model_precision={} codec_device={} codec_precision={} "
-            "mode={} schedule={} sway_coeff={} seconds={} duration_scale={} steps={} seed={} candidates={}"
+            "[gradio-caption] request: mode={} schedule={} sway_coeff={} seconds={} "
+            "duration_scale={} steps={} seed={} candidates={}"
         ).format(
-            model_device,
-            model_precision,
-            codec_device,
-            codec_precision,
             cfg_guidance_mode,
             t_schedule_mode,
             sway_coeff,
@@ -343,6 +307,7 @@ def _run_generation(
         )
     )
 
+    t_wall0 = time.perf_counter()
     result = runtime.synthesize(
         SamplingRequest(
             text=text_value,
@@ -383,6 +348,7 @@ def _run_generation(
         ),
         log_fn=stdout_log,
     )
+    wall_sec = time.perf_counter() - t_wall0
 
     out_dir = Path("gradio_outputs_voicedesign")
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -405,7 +371,10 @@ def _run_generation(
         *result.messages,
     ]
     detail_text = "\n".join(detail_lines)
-    timing_text = _format_timings(result.stage_timings, result.total_to_decode)
+    audio_sec = float(result.audio.shape[-1]) / float(result.sample_rate)
+    timing_text = _format_timings(
+        result.stage_timings, result.total_to_decode, wall_sec, audio_sec
+    )
     stdout_log(f"[gradio-caption] saved {len(out_paths)} candidates")
 
     audio_updates: list[object] = []
@@ -424,14 +393,10 @@ def _clear_runtime_cache() -> str:
 
 def build_ui() -> gr.Blocks:
     default_checkpoint = _default_checkpoint()
-    default_model_device = _default_model_device()
-    default_codec_device = _default_codec_device()
-    device_choices = list_available_runtime_devices()
-    model_precision_choices = _precision_choices_for_device(default_model_device)
-    codec_precision_choices = _precision_choices_for_device(default_codec_device)
 
     with gr.Blocks(title="Irodori-TTS VoiceDesign Gradio") as demo:
         gr.Markdown("# Irodori-TTS VoiceDesign Inference")
+        gr.Markdown(BACKEND_LABEL)
         gr.Markdown(
             "Irodori-TTS-v4-Small向けの統合UIです。captionを入れると声質・スタイルを指定でき、"
             "参照音声と組み合わせることもできます。"
@@ -442,30 +407,6 @@ def build_ui() -> gr.Blocks:
                 label="Model Checkpoint (.pt/.safetensors or HF repo id)",
                 value=default_checkpoint,
                 scale=4,
-            )
-            model_device = gr.Dropdown(
-                label="Model Device",
-                choices=device_choices,
-                value=default_model_device,
-                scale=1,
-            )
-            model_precision = gr.Dropdown(
-                label="Model Precision",
-                choices=model_precision_choices,
-                value=model_precision_choices[0],
-                scale=1,
-            )
-            codec_device = gr.Dropdown(
-                label="Codec Device",
-                choices=device_choices,
-                value=default_codec_device,
-                scale=1,
-            )
-            codec_precision = gr.Dropdown(
-                label="Codec Precision",
-                choices=codec_precision_choices,
-                value=codec_precision_choices[0],
-                scale=1,
             )
 
         with gr.Row():
@@ -609,10 +550,6 @@ def build_ui() -> gr.Blocks:
             _run_generation,
             inputs=[
                 checkpoint,
-                model_device,
-                model_precision,
-                codec_device,
-                codec_precision,
                 text,
                 caption,
                 ref_wavs,
@@ -641,25 +578,13 @@ def build_ui() -> gr.Blocks:
             ],
             outputs=[*out_audios, out_log, out_timing],
         )
-        model_device.change(
-            _on_model_device_change, inputs=[model_device], outputs=[model_precision]
-        )
-        codec_device.change(
-            _on_codec_device_change, inputs=[codec_device], outputs=[codec_precision]
-        )
         t_schedule_mode.change(
             _on_t_schedule_mode_change, inputs=[t_schedule_mode], outputs=[sway_coeff]
         )
 
         load_model_btn.click(
             _describe_runtime,
-            inputs=[
-                checkpoint,
-                model_device,
-                model_precision,
-                codec_device,
-                codec_precision,
-            ],
+            inputs=[checkpoint],
             outputs=[clear_cache_msg],
         )
         clear_cache_btn.click(_clear_runtime_cache, outputs=[clear_cache_msg])

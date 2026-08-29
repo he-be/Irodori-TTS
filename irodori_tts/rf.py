@@ -1321,6 +1321,9 @@ def _sample_euler_rf_cfg_fast(
     if state.ane_runner is not None:
         state.release()
         stats = state.ane_runner.reset_stats()  # type: ignore[attr-defined]
+        stats["ane_active"] = bool(state.ane_active)
+        stats["gpu_branches"] = int(state.ane_gpu_branches)
+        state.ane_runner.last_stats = stats  # type: ignore[attr-defined]
         if opt.ane_log:
             used = "ane" if state.ane_active else "fallback:mps"
             print(
