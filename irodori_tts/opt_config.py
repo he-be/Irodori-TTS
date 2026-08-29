@@ -33,6 +33,7 @@ memory), the MPS backend, batch size 1. Every switch can be toggled through an
     IRODORI_OPT_LOAD_PARALLEL=0    load weights/tokenizer serially instead of overlapping them with
                                    the transformers import (default: overlapped)
     IRODORI_OPT_ROPE_REAL=0        use the complex-number RoPE instead of the real-valued one
+    IRODORI_OPT_AUTO_STEPS=0       do not raise num_steps for long outputs (14-step-count.md)
     IRODORI_OPT_ANE=1              run the RF step on the Neural Engine via Core ML (13-ane.md);
                                    falls back to MPS per request when no enumerated shape fits
     IRODORI_OPT_ANE_GPU_BRANCHES=1 with ANE on and independent CFG, run this many CFG branches
@@ -105,6 +106,7 @@ class OptConfig:
     prebake: bool = True
     load_parallel: bool = True
     rope_real: bool = True
+    auto_steps: bool = True
     ane: bool = False
     ane_gpu_branches: int = 0
     ane_gpu_cond: bool = True
@@ -141,6 +143,7 @@ class OptConfig:
             prebake=_env_bool("IRODORI_OPT_PREBAKE", True),
             load_parallel=_env_bool("IRODORI_OPT_LOAD_PARALLEL", True),
             rope_real=_env_bool("IRODORI_OPT_ROPE_REAL", True),
+            auto_steps=_env_bool("IRODORI_OPT_AUTO_STEPS", True),
             ane=_env_bool("IRODORI_OPT_ANE", False),
             ane_gpu_branches=max(0, _env_int("IRODORI_OPT_ANE_GPU_BRANCHES", 0)),
             ane_gpu_cond=_env_bool("IRODORI_OPT_ANE_GPU_COND", True),

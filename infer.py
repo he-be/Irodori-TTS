@@ -170,10 +170,10 @@ def main() -> None:
             "Defaults to checkpoint metadata max_caption_len when available, else max_text_len."
         ),
     )
-    # 8 sway steps on this branch: 2.1x faster than 40 linear steps and indistinguishable by
-    # ear (docs/experiments/14-step-count.md). Pass --num-steps 40 --t-schedule-mode linear
-    # for the upstream default.
-    parser.add_argument("--num-steps", type=int, default=8)
+    # 12 sway steps on this branch, raised to 16 past 20 s of output by the runtime's
+    # auto-step floor (docs/experiments/14-step-count.md). Pass --num-steps 40
+    # --t-schedule-mode linear for the upstream default.
+    parser.add_argument("--num-steps", type=int, default=12)
     parser.add_argument(
         "--t-schedule-mode",
         choices=["linear", "sway"],

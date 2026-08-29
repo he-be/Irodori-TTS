@@ -3,7 +3,8 @@
 対象: `metal-local` ブランチ / M3 Pro (18 GB) / macOS 15.7.5。
 背景と測定の詳細は [12-metal-port.md](experiments/12-metal-port.md)（Metal 専用化）、
 [13-ane.md](experiments/13-ane.md)（Neural Engine 併用）、
-[14-step-count.md](experiments/14-step-count.md)（sway 8 step 既定化）にあります。
+[14-step-count.md](experiments/14-step-count.md)（sway 12 step 既定化 + 長さによる自動引き上げ）に
+あります。
 
 **実測** = 手元で数字を取ったもの。**未確認** = 根拠なし、断定しない。
 
@@ -18,8 +19,9 @@ text / speaker / caption encoder と codec decode は GPU です。
 | RF step の cond CFG 1 分岐 | GPU (MPS) |
 | encoder 各種 / codec decode | GPU (MPS) |
 
-さらに sampler の step 数を 40 → 8（sway sampling）に落としてあります。
-素の MPS eager / 40 step 比で **3.2×**（short で RTF 0.480 → 0.148、実測）。
+さらに sampler の step 数を 40 → 12（sway sampling、20 秒以上の出力は自動で 16）に落としてあります。
+素の MPS eager / 40 step 比で **3.4×**（short で RTF 0.480 → 0.142、Gradio の既定 = ANE + compile、実測）。
+内訳は step 削減 2.06× / ANE 1.35× / compile 1.23×（7 節）。
 
 ## 2. 初回だけ必要な準備
 
@@ -62,10 +64,14 @@ IRODORI_OPT_COMPILE_CODEC=1    codec decode を torch.compile
 精度も bf16 は積分誤差が発散して別の読みになる（12-metal-port.md 5-6）ため、選ぶ意味がないので
 UI から外してあります。
 
-サンプラの既定は **Num Steps 8 / Time Schedule sway / Sway Coeff −1.0** です（14-step-count.md）。
-40 step linear の出力に近づけたいときは UI で Num Steps を上げてください（16 で RTF 0.195、
-40 で 0.319）。同じ 8 step でも linear は明確に品質が落ちるので、step を減らすときは sway のままに
-してください。
+サンプラの既定は **Num Steps 12 / Time Schedule sway / Sway Coeff −1.0** です（14-step-count.md）。
+さらに **出力が 20 秒以上になる request は自動で 16 step に引き上げます**（`IRODORI_OPT_AUTO_STEPS=0`
+で無効化）。適用されると Run Log に `info: auto steps 12 -> 16 for a 32.3s output.` が出ます。
+これは**下限としてのみ**働くので、UI で 40 を指定した request が下げられることはありません。
+
+**8 step まで下げないでください**: 15 秒以下なら聴き分けられませんが、長文で 8 kHz 以上のノイズが
+4〜5 dB 増えます（14-step-count.md 3-5）。また同じ step 数なら linear より sway の方が明確に良いので、
+Time Schedule は sway のままにしてください。
 
 ## 4. 画面の見方
 
@@ -73,19 +79,20 @@ UI から外してあります。
 
 ```
 [timing] prepare_reference: 1.2 ms       ← 1 桁 ms なら参照キャッシュが効いている
-[timing] sample_rf: 378.1 ms
-[timing] decode_latent: 653.0 ms
-[timing] wall: 1.069 s  audio: 7.20 s  RTF: 0.148
+[timing] sample_rf: 522.7 ms
+[timing] decode_latent: 462.7 ms
+[timing] wall: 1.023 s  audio: 7.20 s  RTF: 0.142
 ```
 
-8 step では **codec decode の方が sample_rf より重い**（wall の約 6 割）ので、Timing の内訳は
-40 step 時代と見え方が変わります。
+12 step では **decode と sample_rf がほぼ拮抗します**（compile 済みで 463 vs 523 ms）。
+40 step 時代は sample_rf が decode の 2.4 倍で、内訳の見え方が変わっています。
 
 **Run Log** パネル:
 
 ```
 info: speaker state served from L2 cache.                        ← 参照キャッシュのヒット
-info: rf step on ANE + GPU (steps=8, predict=302 ms, gpu_branches=1)
+info: auto steps 12 -> 16 for a 32.3s output.   ← 20 秒以上の出力のときだけ出る
+info: rf step on ANE + GPU (steps=12, predict=430 ms, gpu_branches=1)
 ```
 
 最後の行が `rf step on MPS (ANE fallback)` になっていたら、そのリクエストは ANE を使わず
@@ -122,8 +129,8 @@ text / steps / seed / cfg / duration の変更はキャッシュに影響しま�
 ### 初回リクエストは遅い
 
 ANE パッケージのロード（6 個で 2.3 s）と `torch.compile`（DiT 約 20 s + codec 約 4 s）が最初の
-リクエストに乗ります。**実測**: 同じ short 入力で 1 回目 6.92 s → 2 回目 2.18 s（40 step 当時。8 step でも初回に乗る
-固定費は同じ）。
+リクエストに乗ります。**実測**: 同じ short 入力で 1 回目 6.92 s → 2 回目 2.18 s（40 step 当時の測定。
+step 数を変えても初回に乗る固定費は同じ）。
 速度を見るときは 2 回目以降の数字を見てください。
 
 コンパイルを待ちたくない場合は `IRODORI_OPT_COMPILE_DIT=0 IRODORI_OPT_COMPILE_CODEC=0` を付けて起動
@@ -162,18 +169,46 @@ CPU に落ちずに例外になります（黙って 10 倍遅くなるのを防
 
 単発起動ではパッケージのロードとコンパイルが見合わないため、CLI は ANE も compile も無効が既定です。
 色々試すなら Gradio を上げっぱなしにするのが一番速いです。
-サンプラの既定（`--num-steps 8 --t-schedule-mode sway`）は Gradio と揃えてあります。upstream と
+サンプラの既定（`--num-steps 12 --t-schedule-mode sway` と auto-step）は Gradio と揃えてあります。upstream と
 同じ出力が要るときは `--num-steps 40 --t-schedule-mode linear` を明示してください。
 
 ## 7. 参考値（実測、fp16、3 回中央値、13-ane.md 5 節 / 14-step-count.md 3 節）
 
-| 入力 | 音声長 | MPS eager 40 step | ANE + GPU 40 step | **既定（ANE + sway 8 step）** | RTF |
-|---|---:|---:|---:|---:|---:|
-| short | 7.20 s | 3459 ms | 2299 ms | **1069 ms** | 0.148 |
-| medium | 11.84 s | 5872 ms | 3931 ms | **1778 ms** | 0.150 |
-| long | 28.84 s | 16450 ms | 11210 ms | **4671 ms** | 0.162 |
-| caption + no-ref | 7.32 s | 3463 ms | 2323 ms | **1091 ms** | 0.149 |
+同じ step 数で MPS と ANE を並べた比較（fp16、3 回中央値、seed 1234、括弧内は RTF）。
+long は auto-step で 16 step が適用された値です。
 
-品質は聴感で判断しています（ユーザー確認、2026-08-29）。ANE と MPS の差、および 8 step と 40 step の
+**40 step linear（改善前の基準）**:
+
+| 構成 | short | medium | long | caption_noref |
+|---|---:|---:|---:|---:|
+| MPS eager | 3459 ms (0.480) | 5872 (0.496) | 16450 (0.570) | 3463 (0.473) |
+| MPS + compile | 2860 (0.397) | 4883 (0.412) | 14039 (0.487) | 2863 (0.391) |
+| ANE + GPU | 2299 (0.319) | 3931 (0.332) | 11210 (0.389) | 2323 (0.317) |
+
+**sway 12 step（現在の既定）**:
+
+| 構成 | short | medium | long | caption_noref |
+|---|---:|---:|---:|---:|
+| MPS eager | 1678 ms (0.233) | 2716 (0.229) | 8908 (0.309) | 1689 (0.231) |
+| MPS + compile | 1277 (0.177) | 2039 (0.172) | 6984 (0.242) | 1235 (0.169) |
+| ANE + GPU | 1247 (0.173) | 2086 (0.176) | 6697 (0.232) | 1241 (0.169) |
+| **ANE + GPU + compile（Gradio の既定）** | **1023 (0.142)** | **1713 (0.145)** | **5776 (0.200)** | **1025 (0.140)** |
+
+short での寄与の分離: step 40 → 12 が **2.06×**、そこに ANE が **1.35×**、compile が **1.23×** 乗って
+合計 **3.38×**（MPS eager 40 step の 3459 ms → 1023 ms）。
+
+**注意**: 13-ane.md の「ANE で 1.50×」は 40 step 前提の数字です。12 step では sample_rf の比重が
+下がるので ANE の効きは 1.25〜1.35× に縮み、MPS + compile (1277 ms) と ANE eager (1247 ms) は
+ほぼ並びます。それでも ANE を既定にしているのは、compile が初回 20 s かかりプロセスを跨げないのに対し、
+ANE のパッケージは 2 回目以降 0.2 s でロードできるためです。
+
+内訳では短縮分の大半が sample_rf です（short: 2639 → 523 ms、5.0×）。decode は 783 → 463 ms（1.7×）
+で、いまや **decode の方が sample_rf より重い**（既定の short で 463 vs 523 ms、ほぼ拮抗）。
+
+品質は聴感で判断しています（ユーザー確認、2026-08-29）。ANE と MPS の差、および 12 step と 40 step の
 差はどちらも聴き分けられませんでした。波形距離（LSD）は step 数を変えると原理的に大きく出る
 （別のサンプルになるため）ので、step 数の判定には使えません。詳細は 14-step-count.md 3-2。
+
+既知の問題（step 数とは無関係、14-step-count.md 5 節）: **末尾が 1 秒ほど切れることがある**（40 step
+linear でも発生）。**30 秒を超える文章は `max_seconds` の既定で途中で切れる**（UI・CLI に露出なし）ので
+分割して投げてください。

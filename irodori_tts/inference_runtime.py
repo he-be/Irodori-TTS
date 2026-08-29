@@ -291,6 +291,19 @@ class SamplingResult:
     messages: list[str]
 
 
+# Sway sampling at 8 steps adds high-frequency noise, and more of it the longer the output
+# gets (14-step-count.md 3-5): 12 steps is the floor everywhere, 16 past 20 seconds. Applied
+# as a floor on the requested step count, so an explicitly higher setting is never lowered.
+AUTO_STEP_FLOOR_BY_SECONDS: tuple[tuple[float, int], ...] = ((20.0, 16), (0.0, 12))
+
+
+def _auto_step_floor(seconds: float) -> int:
+    for threshold, steps in AUTO_STEP_FLOOR_BY_SECONDS:
+        if seconds >= threshold:
+            return steps
+    return 0
+
+
 def _maybe_compile_inference_model(
     model: TextToLatentRFDiT,
     *,
@@ -1850,6 +1863,19 @@ class InferenceRuntime:
                     messages.append(msg)
                     _log(msg)
 
+            num_steps_used = int(req.num_steps)
+            if opt.auto_steps:
+                predicted_seconds = float(target_samples) / float(self.codec.sample_rate)
+                floor_steps = _auto_step_floor(predicted_seconds)
+                if floor_steps > num_steps_used:
+                    msg = (
+                        f"info: auto steps {num_steps_used} -> {floor_steps} for a "
+                        f"{predicted_seconds:.1f}s output (IRODORI_OPT_AUTO_STEPS=0 to disable)."
+                    )
+                    messages.append(msg)
+                    _log(msg)
+                    num_steps_used = floor_steps
+
             t0 = _measure_start(self.model_device)
             z_patched = sample_euler_rf_cfg(
                 model=self.model,
@@ -1863,7 +1889,7 @@ class InferenceRuntime:
                 speaker_state_override=speaker_state_override,
                 speaker_mask_override=speaker_mask_override,
                 speaker_uncond_mode=req.speaker_uncond_mode,
-                num_steps=int(req.num_steps),
+                num_steps=num_steps_used,
                 cfg_scale_text=cfg_scale_text,
                 cfg_scale_caption=cfg_scale_caption,
                 cfg_scale_speaker=cfg_scale_speaker,

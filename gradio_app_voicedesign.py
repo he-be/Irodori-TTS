@@ -444,10 +444,11 @@ def build_ui() -> gr.Blocks:
 
         with gr.Accordion("Sampling", open=True):
             with gr.Row():
-                # 8 sway steps: RTF 0.149 vs 0.319 at 40 linear steps, indistinguishable by ear
-                # (docs/experiments/14-step-count.md). Raise this for a closer match to the
+                # 12 sway steps, raised to 16 past 20 s of output by the runtime's auto-step
+                # floor (docs/experiments/14-step-count.md): 8 steps adds audible
+                # high-frequency noise on longer text. Raise this for a closer match to the
                 # 40-step sample.
-                num_steps = gr.Slider(label="Num Steps", minimum=1, maximum=120, value=8, step=1)
+                num_steps = gr.Slider(label="Num Steps", minimum=1, maximum=120, value=12, step=1)
                 num_candidates = gr.Slider(
                     label="Num Candidates",
                     minimum=1,
