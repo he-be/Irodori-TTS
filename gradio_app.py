@@ -435,7 +435,10 @@ def build_ui() -> gr.Blocks:
 
         with gr.Accordion("Sampling", open=True):
             with gr.Row():
-                num_steps = gr.Slider(label="Num Steps", minimum=1, maximum=120, value=40, step=1)
+                # 8 sway steps: RTF 0.149 vs 0.319 at 40 linear steps, indistinguishable by ear
+                # (docs/experiments/14-step-count.md). Raise this for a closer match to the
+                # 40-step sample.
+                num_steps = gr.Slider(label="Num Steps", minimum=1, maximum=120, value=8, step=1)
                 num_candidates = gr.Slider(
                     label="Num Candidates",
                     minimum=1,
@@ -457,7 +460,7 @@ def build_ui() -> gr.Blocks:
                 t_schedule_mode = gr.Dropdown(
                     label="Time Schedule",
                     choices=["linear", "sway"],
-                    value="linear",
+                    value="sway",
                 )
                 sway_coeff = gr.Slider(
                     label="Sway Coeff",
@@ -465,7 +468,7 @@ def build_ui() -> gr.Blocks:
                     maximum=1.5,
                     value=-1.0,
                     step=0.1,
-                    interactive=False,
+                    interactive=True,
                 )
 
             with gr.Row():

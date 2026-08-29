@@ -77,10 +77,15 @@ Differences from `main` that matter for inference:
   by default (`IRODORI_OPT_COMPILE_DIT=1 IRODORI_OPT_COMPILE_CODEC=1`): the first request
   pays ~20 s, every later one is ~17% faster. The CLI leaves it off because the compile
   cache does not survive the process. Measured on the M3 Pro: short utterance (7.2 s)
-  in 2.9 s with compile / 3.5 s without (RTF 0.40 / 0.48).
+  in 2.9 s with compile / 3.5 s without at 40 linear steps (RTF 0.40 / 0.48), and 1.07 s
+  with the current ANE + 8-sway-step defaults (RTF 0.15).
 - The RF step runs on the **Neural Engine** with the cond CFG branch on the GPU when the
   Core ML packages are built (`bench/build_ane.py --shapes full`); both Gradio apps enable
   this by default (1.50x over MPS eager on the M3 Pro). See `docs/experiments/13-ane.md`.
+- The sampler defaults to **8 sway steps** instead of 40 linear ones (`--num-steps 8
+  --t-schedule-mode sway`, and the same defaults in both Gradio apps): 2.15x faster, and
+  indistinguishable by ear on this branch's inputs. Pass `--num-steps 40 --t-schedule-mode
+  linear` for the upstream default. See `docs/experiments/14-step-count.md`.
 - Training (`train.py`) is untouched and still CUDA-oriented; it is not exercised on
   this branch.
 

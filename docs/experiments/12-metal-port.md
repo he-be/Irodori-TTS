@@ -194,7 +194,7 @@ max abs diff 7e-4〜1.3e-3、長さ一致、再実行は bit 一致（`repeat_ma
 
 次のアクション（未着手）:
 1. 演算律速なので残る大玉は **step 数 / CFG の削減**（品質が変わる。`--num-steps`, `--cfg-min-t` を
-   聴感で詰める）。fp16 で 190 µs/token を切るには elementwise の融合（compile で 21% は取れた）。
+   聴感で詰める）。→ **14 で sway 8 step を既定化**（`--cfg-min-t` は未着手）。fp16 で 190 µs/token を切るには elementwise の融合（compile で 21% は取れた）。
 2. `LowRankAdaLN` / `RMSNorm` の fp32 経由（`x.float()`）を fp16 のまま計算できるか（品質要確認）。
 3. 聴感評価（fp16 / compile / step 数）。
 4. `IRODORI_OPT_MPS_LIMIT_MB` の実効性は未確認。

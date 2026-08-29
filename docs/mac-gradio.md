@@ -1,8 +1,9 @@
 # Mac (Apple Silicon) で Gradio を動かす
 
 対象: `metal-local` ブランチ / M3 Pro (18 GB) / macOS 15.7.5。
-背景と測定の詳細は [12-metal-port.md](experiments/12-metal-port.md)（Metal 専用化）と
-[13-ane.md](experiments/13-ane.md)（Neural Engine 併用）にあります。
+背景と測定の詳細は [12-metal-port.md](experiments/12-metal-port.md)（Metal 専用化）、
+[13-ane.md](experiments/13-ane.md)（Neural Engine 併用）、
+[14-step-count.md](experiments/14-step-count.md)（sway 8 step 既定化）にあります。
 
 **実測** = 手元で数字を取ったもの。**未確認** = 根拠なし、断定しない。
 
@@ -17,7 +18,8 @@ text / speaker / caption encoder と codec decode は GPU です。
 | RF step の cond CFG 1 分岐 | GPU (MPS) |
 | encoder 各種 / codec decode | GPU (MPS) |
 
-素の MPS eager 比 **1.50×**（short で RTF 0.480 → 0.319、実測）。
+さらに sampler の step 数を 40 → 8（sway sampling）に落としてあります。
+素の MPS eager / 40 step 比で **3.2×**（short で RTF 0.480 → 0.148、実測）。
 
 ## 2. 初回だけ必要な準備
 
@@ -57,25 +59,33 @@ IRODORI_OPT_COMPILE_CODEC=1    codec decode を torch.compile
 ```
 
 デバイスと精度は **mps + fp16 固定**で、UI から選べません。デバイスの選択肢は元々 `mps` の 1 択、
-精度も bf16 は 40 step の積分で誤差が発散して別の読みになる（12-metal-port.md 5-6）ため、
-選ぶ意味がないので UI から外してあります。
+精度も bf16 は積分誤差が発散して別の読みになる（12-metal-port.md 5-6）ため、選ぶ意味がないので
+UI から外してあります。
+
+サンプラの既定は **Num Steps 8 / Time Schedule sway / Sway Coeff −1.0** です（14-step-count.md）。
+40 step linear の出力に近づけたいときは UI で Num Steps を上げてください（16 で RTF 0.195、
+40 で 0.319）。同じ 8 step でも linear は明確に品質が落ちるので、step を減らすときは sway のままに
+してください。
 
 ## 4. 画面の見方
 
 **Timing** パネル:
 
 ```
-[timing] prepare_reference: 4.7 ms       ← 1 桁 ms なら参照キャッシュが効いている
-[timing] sample_rf: 1573.7 ms
-[timing] decode_latent (sequential): 663.9 ms
-[timing] wall: 2.295 s  audio: 7.20 s  RTF: 0.319
+[timing] prepare_reference: 1.2 ms       ← 1 桁 ms なら参照キャッシュが効いている
+[timing] sample_rf: 378.1 ms
+[timing] decode_latent: 653.0 ms
+[timing] wall: 1.069 s  audio: 7.20 s  RTF: 0.148
 ```
+
+8 step では **codec decode の方が sample_rf より重い**（wall の約 6 割）ので、Timing の内訳は
+40 step 時代と見え方が変わります。
 
 **Run Log** パネル:
 
 ```
 info: speaker state served from L2 cache.                        ← 参照キャッシュのヒット
-info: rf step on ANE + GPU (steps=40, predict=1486 ms, gpu_branches=1)
+info: rf step on ANE + GPU (steps=8, predict=302 ms, gpu_branches=1)
 ```
 
 最後の行が `rf step on MPS (ANE fallback)` になっていたら、そのリクエストは ANE を使わず
@@ -112,7 +122,8 @@ text / steps / seed / cfg / duration の変更はキャッシュに影響しま�
 ### 初回リクエストは遅い
 
 ANE パッケージのロード（6 個で 2.3 s）と `torch.compile`（DiT 約 20 s + codec 約 4 s）が最初の
-リクエストに乗ります。**実測**: 同じ short 入力で 1 回目 6.92 s → 2 回目 2.18 s。
+リクエストに乗ります。**実測**: 同じ short 入力で 1 回目 6.92 s → 2 回目 2.18 s（40 step 当時。8 step でも初回に乗る
+固定費は同じ）。
 速度を見るときは 2 回目以降の数字を見てください。
 
 コンパイルを待ちたくない場合は `IRODORI_OPT_COMPILE_DIT=0 IRODORI_OPT_COMPILE_CODEC=0` を付けて起動
@@ -151,16 +162,18 @@ CPU に落ちずに例外になります（黙って 10 倍遅くなるのを防
 
 単発起動ではパッケージのロードとコンパイルが見合わないため、CLI は ANE も compile も無効が既定です。
 色々試すなら Gradio を上げっぱなしにするのが一番速いです。
+サンプラの既定（`--num-steps 8 --t-schedule-mode sway`）は Gradio と揃えてあります。upstream と
+同じ出力が要るときは `--num-steps 40 --t-schedule-mode linear` を明示してください。
 
-## 7. 参考値（実測、fp16、3 回中央値、13-ane.md 5 節）
+## 7. 参考値（実測、fp16、3 回中央値、13-ane.md 5 節 / 14-step-count.md 3 節）
 
-| 入力 | 音声長 | MPS eager | ANE + GPU | RTF |
-|---|---:|---:|---:|---:|
-| short | 7.20 s | 3459 ms | **2299 ms** | 0.319 |
-| medium | 11.84 s | 5872 ms | **3931 ms** | 0.331 |
-| long | 28.84 s | 16450 ms | **11210 ms** | 0.393 |
-| caption + no-ref | 7.32 s | 3463 ms | **2323 ms** | 0.316 |
-| short × 2 候補 | | 6.40 s | **4.16 s** | |
+| 入力 | 音声長 | MPS eager 40 step | ANE + GPU 40 step | **既定（ANE + sway 8 step）** | RTF |
+|---|---:|---:|---:|---:|---:|
+| short | 7.20 s | 3459 ms | 2299 ms | **1069 ms** | 0.148 |
+| medium | 11.84 s | 5872 ms | 3931 ms | **1778 ms** | 0.150 |
+| long | 28.84 s | 16450 ms | 11210 ms | **4671 ms** | 0.162 |
+| caption + no-ref | 7.32 s | 3463 ms | 2323 ms | **1091 ms** | 0.149 |
 
-品質は fp32 出力を基準に SNR 23.8 dB / LSD 0.16 dB（short）。聴感では MPS 版と区別がつきません
-（ユーザー確認、2026-08-29、13-ane.md 6 節）。
+品質は聴感で判断しています（ユーザー確認、2026-08-29）。ANE と MPS の差、および 8 step と 40 step の
+差はどちらも聴き分けられませんでした。波形距離（LSD）は step 数を変えると原理的に大きく出る
+（別のサンプルになるため）ので、step 数の判定には使えません。詳細は 14-step-count.md 3-2。

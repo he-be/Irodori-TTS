@@ -220,5 +220,5 @@ step 単位の検証は `bench/check_ane.py`（実入力を捕捉して MPS fp16
    ベンチの 4 入力は全部 profile a で、bucket は dev と同じ 192 / 320 / 768 に当たる。
 3. worker プロセスの RSS と、6 package を同時にロードしたときのメモリ。
 4. step 数削減（sway sampling、`t_schedule_mode=sway` は runtime に実装済み）は ANE と直交する。
-   ANE 経路で 8〜10 step にしたときの品質は未確認。
+   → **14 で実施**: sway 8 step が聴感で問題なく、short 2299 → 1069 ms（RTF 0.32 → 0.15）。既定を変更した。
 5. サーバ運用でのパイプライン（request N の decode と N+1 の DiT の重ね合わせ）は未実装。

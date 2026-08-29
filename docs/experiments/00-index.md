@@ -15,3 +15,4 @@
 | 11 | [11-load-time.md](11-load-time.md) | ロード時間の分解。捨てる乱数初期化の除去、事前計算バンドル（prebake）、import 裏での並列ロード → **9.55 → 5.08 s** | 完了 |
 | 12 | [12-metal-port.md](12-metal-port.md) | **ブランチ `metal-local`**: Apple M3 Pro / Metal (MPS) 専用化。CUDA Graph・VRAM cap 撤去、実数 RoPE、fp16 既定、MPS スレッド制約、compile、warm ベンチ → **short RTF 0.40（compile）/ 0.48（eager）** | 完了 |
 | 13 | [13-ane.md](13-ane.md) | **ANE**: RF step を Core ML で Neural Engine に載せ（torch.export、package 単位の列挙形状、exp 活性化）、GPU に cond 分岐 / 候補 2 を並走 → **short 3459 → 2299 ms（RTF 0.32）**、2 候補 6.40 → 4.16 s | 完了 |
+| 14 | [14-step-count.md](14-step-count.md) | **step 数削減**: sway sampling で 40 → 8 step。同 step なら sway が linear より 40 step 解に近い（medium LSD 6.73 vs 11.35 dB）、聴感で問題なし → **既定を sway 8 step に変更、short 2299 → 1069 ms（RTF 0.15）**。律速は codec decode に移動 | 完了 |

@@ -138,6 +138,13 @@ def main() -> None:
     parser.add_argument("--ref", default=DEFAULT_REF)
     parser.add_argument("--inputs", nargs="+", default=["short", "medium", "long"])
     parser.add_argument("--num-steps", type=int, default=40)
+    parser.add_argument("--t-schedule-mode", choices=["linear", "sway"], default="linear")
+    parser.add_argument(
+        "--sway-coeff",
+        type=float,
+        default=-1.0,
+        help="Sway sampling coefficient (negative densifies the noisy end).",
+    )
     parser.add_argument("--num-candidates", type=int, default=1)
     parser.add_argument("--cfg-guidance-mode", default="independent")
     parser.add_argument("--seed", type=int, default=1234)
@@ -193,6 +200,8 @@ def main() -> None:
             ref_wav=None if no_ref else args.ref,
             no_ref=no_ref,
             num_steps=int(args.num_steps),
+            t_schedule_mode=str(args.t_schedule_mode),
+            sway_coeff=float(args.sway_coeff),
             num_candidates=int(args.num_candidates),
             cfg_guidance_mode=str(args.cfg_guidance_mode),
             seed=int(args.seed),
@@ -289,6 +298,8 @@ def main() -> None:
             "compile": bool(args.compile),
             "compile_dynamic": bool(args.compile_dynamic),
             "num_steps": args.num_steps,
+            "t_schedule_mode": args.t_schedule_mode,
+            "sway_coeff": args.sway_coeff,
             "cfg_guidance_mode": args.cfg_guidance_mode,
             "seed": args.seed,
             "warmup": args.warmup,
