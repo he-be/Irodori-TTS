@@ -4,6 +4,7 @@ import math
 
 import torch
 
+from .ane_dit import get_ane_runner
 from .model import TextToLatentRFDiT
 from .opt_config import OptConfig, get_opt_config
 from .speaker_inversion import SPEAKER_INVERSION_UNCOND_MODES
@@ -598,6 +599,40 @@ _Bundle = tuple[
 ]
 
 
+def _slice_bundle(bundle: _Bundle, start: int, stop: int) -> _Bundle:
+    return tuple(None if t is None else t[start:stop] for t in bundle)  # type: ignore[return-value]
+
+
+def _slice_kv(
+    kv: list[tuple[torch.Tensor, ...]] | None, start: int, stop: int
+) -> list[tuple[torch.Tensor, ...]] | None:
+    if kv is None:
+        return None
+    return [tuple(t[start:stop] for t in layer) for layer in kv]
+
+
+def _index_bundle(bundle: _Bundle, rows: list[int]) -> _Bundle:
+    idx = None
+    out = []
+    for t in bundle:
+        if t is None:
+            out.append(None)
+            continue
+        if idx is None:
+            idx = torch.tensor(rows, device=t.device)
+        out.append(t.index_select(0, idx))
+    return tuple(out)  # type: ignore[return-value]
+
+
+def _index_kv(
+    kv: list[tuple[torch.Tensor, ...]] | None, rows: list[int]
+) -> list[tuple[torch.Tensor, ...]] | None:
+    if kv is None:
+        return None
+    idx = torch.tensor(rows, device=kv[0][0].device)
+    return [tuple(t.index_select(0, idx) for t in layer) for layer in kv]
+
+
 def _cat_optional(values: list[torch.Tensor | None]) -> torch.Tensor | None:
     present = [value for value in values if value is not None]
     if not present:
@@ -659,8 +694,26 @@ class _FastSamplerState:
         rescale_sigma: float | None,
         latent_len: int,
         latent_mask: torch.Tensor | None,
+        ane_runner: object | None = None,
+        ane_gpu_branches: int = 0,
+        ane_gpu_cond: bool = True,
+        ane_nocfg_gpu: bool = False,
+        ane_candidates: bool = True,
     ) -> None:
         self.model = model
+        # Neural Engine path (13-ane.md): contexts are built lazily per bundle; any miss
+        # (no enumerated shape fits, batch > 1) turns the ANE off for this request.
+        self.ane_runner = ane_runner
+        self.ane_gpu_branches = int(ane_gpu_branches)
+        # The cond branch is amplified by (1 + sum of guidance scales) in the CFG combination,
+        # so by default it is the branch that goes to the (more precise) GPU.
+        self.ane_gpu_cond = bool(ane_gpu_cond)
+        self.ane_nocfg_gpu = bool(ane_nocfg_gpu)
+        # num_candidates=2: candidate 0 on the ANE, candidate 1 on the GPU, concurrently.
+        self.ane_candidates = bool(ane_candidates)
+        self._cand_cache: dict[str, object] = {}
+        self.ane_active = ane_runner is not None
+        self._ane_ctx: dict[str, object] = {}
         self.cond_bundle = cond_bundle
         self.context_kv_cond = context_kv_cond
         self.cfg_batch_mult = cfg_batch_mult
@@ -747,6 +800,138 @@ class _FastSamplerState:
             attn_mask=self.mask_for(mask_name, bundle, context_kv is not None),
         )
 
+    def _ane_context(self, name: str, bundle: _Bundle) -> object | None:
+        ctx = self._ane_ctx.get(name)
+        if ctx is None and name not in self._ane_ctx:
+            if bundle[2] is None or bundle[3] is None or bundle[4] is None or bundle[5] is None:
+                ctx = None
+            else:
+                ctx = self.ane_runner.make_context(  # type: ignore[union-attr]
+                    latent_len=self.latent_len,
+                    text_state=bundle[0],
+                    text_mask=bundle[1],
+                    speaker_state=bundle[2],
+                    speaker_mask=bundle[3],
+                    caption_state=bundle[4],
+                    caption_mask=bundle[5],
+                )
+            self._ane_ctx[name] = ctx
+            if ctx is None:
+                self.ane_active = False
+        return ctx
+
+    def release(self) -> None:
+        if self.ane_runner is not None:
+            for ctx in self._ane_ctx.values():
+                if ctx is not None:
+                    self.ane_runner.drop_context(ctx)  # type: ignore[attr-defined]
+            self._ane_ctx = {}
+
+    def _cfg_combine(self, v_branches: torch.Tensor, mult: int) -> torch.Tensor:
+        chunks = v_branches.chunk(mult, dim=0)
+        v = chunks[0]
+        for name, chunk in zip(self.independent_names[1:], chunks[1:], strict=True):
+            v = v + self.cfg_scales[name] * (chunks[0] - chunk)
+        return v
+
+    def _cand(self, name: str, build):  # noqa: ANN001
+        value = self._cand_cache.get(name)
+        if value is None and name not in self._cand_cache:
+            value = build()
+            self._cand_cache[name] = value
+        return value
+
+    def _velocity_ane_candidates(
+        self, x_t: torch.Tensor, tt: torch.Tensor, t_value: float, *, use_cfg: bool
+    ) -> torch.Tensor | None:
+        """num_candidates=2: the whole request of candidate 0 runs on the ANE while candidate 1
+        runs the regular MPS path, step by step in lockstep. Bundles are branch-major
+        [cond(c0,c1), uncond_1(c0,c1), ...], so candidate c owns rows c, c+2, c+4, ..."""
+        runner = self.ane_runner
+        device, dtype = x_t.device, x_t.dtype
+        if use_cfg and self.enabled_cfg_names:
+            assert self.independent_bundle is not None
+            mult = self.cfg_batch_mult
+            rows0 = [2 * b for b in range(mult)]
+            rows1 = [2 * b + 1 for b in range(mult)]
+            bundle0 = self._cand("cfg_b0", lambda: _index_bundle(self.independent_bundle, rows0))
+            bundle1 = self._cand("cfg_b1", lambda: _index_bundle(self.independent_bundle, rows1))
+            kv1 = self._cand("cfg_kv1", lambda: _index_kv(self.context_kv_cfg, rows1))
+            ctx = self._ane_context("cand0_cfg", bundle0)
+            if ctx is None:
+                return None
+            runner.submit(ctx, x_t[0:1].repeat(mult, 1, 1), t_value)  # type: ignore[attr-defined]
+            v1 = self.forward(x_t[1:2].repeat(mult, 1, 1), tt[1:2].repeat(mult), bundle1, kv1, "cand1_cfg")
+            v0 = runner.wait().to(device=device, dtype=dtype)  # type: ignore[attr-defined]
+            return torch.cat([self._cfg_combine(v0, mult), self._cfg_combine(v1, mult)], dim=0)
+        bundle0 = self._cand("cond_b0", lambda: _index_bundle(self.cond_bundle, [0]))
+        bundle1 = self._cand("cond_b1", lambda: _index_bundle(self.cond_bundle, [1]))
+        kv1 = self._cand("cond_kv1", lambda: _index_kv(self.context_kv_cond, [1]))
+        ctx = self._ane_context("cand0_cond", bundle0)
+        if ctx is None:
+            return None
+        runner.submit(ctx, x_t[0:1], t_value)  # type: ignore[attr-defined]
+        v1 = self.forward(x_t[1:2], tt[1:2], bundle1, kv1, "cand1_cond")
+        v0 = runner.wait().to(device=device, dtype=dtype)  # type: ignore[attr-defined]
+        return torch.cat([v0, v1], dim=0)
+
+    def _velocity_ane(
+        self, x_t: torch.Tensor, tt: torch.Tensor, t_value: float, *, use_cfg: bool
+    ) -> torch.Tensor | None:
+        """ANE (+ optional GPU branches) velocity for ``independent`` CFG; None = fall back."""
+        runner = self.ane_runner
+        if runner is None:
+            return None
+        if x_t.shape[0] == 2 and self.ane_candidates:
+            return self._velocity_ane_candidates(x_t, tt, t_value, use_cfg=use_cfg)
+        if x_t.shape[0] != 1:
+            return None
+        device, dtype = x_t.device, x_t.dtype
+        if use_cfg and self.enabled_cfg_names:
+            assert self.independent_bundle is not None
+            mult = self.cfg_batch_mult
+            n_gpu = max(0, min(self.ane_gpu_branches, mult - 1))
+            n_ane = mult - n_gpu
+            # Branch layout of the independent bundle is [cond, uncond_1, ...]. The GPU takes
+            # a contiguous slice: the head (cond) when ane_gpu_cond, else the tail.
+            if n_gpu > 0 and self.ane_gpu_cond:
+                gpu_lo, gpu_hi = 0, n_gpu
+                ane_lo, ane_hi = n_gpu, mult
+            else:
+                ane_lo, ane_hi = 0, n_ane
+                gpu_lo, gpu_hi = n_ane, mult
+            ctx = self._ane_context(
+                f"cfg_ane{ane_lo}_{ane_hi}", _slice_bundle(self.independent_bundle, ane_lo, ane_hi)
+            )
+            if ctx is None:
+                return None
+            # Order matters: hand the ANE its work first, then enqueue the GPU branch(es) so
+            # both units run the same step at the same time, then collect.
+            runner.submit(ctx, x_t.repeat(n_ane, 1, 1), t_value)  # type: ignore[attr-defined]
+            v_gpu: torch.Tensor | None = None
+            if n_gpu > 0:
+                v_gpu = self.forward(
+                    x_t.repeat(n_gpu, 1, 1),
+                    tt.repeat(n_gpu),
+                    _slice_bundle(self.independent_bundle, gpu_lo, gpu_hi),
+                    _slice_kv(self.context_kv_cfg, gpu_lo, gpu_hi),
+                    f"independent_gpu{gpu_lo}_{gpu_hi}",
+                )
+            v_ane = runner.wait().to(device=device, dtype=dtype)  # type: ignore[attr-defined]
+            chunks: list[torch.Tensor | None] = [None] * mult
+            for i, chunk in enumerate(v_ane.chunk(n_ane, dim=0)):
+                chunks[ane_lo + i] = chunk
+            if v_gpu is not None:
+                for i, chunk in enumerate(v_gpu.chunk(n_gpu, dim=0)):
+                    chunks[gpu_lo + i] = chunk
+            return self._cfg_combine(torch.cat(chunks, dim=0), mult)  # type: ignore[arg-type]
+        if self.ane_nocfg_gpu:
+            return None  # plain cond step on the GPU (the ANE idles in this phase)
+        ctx = self._ane_context("cond", self.cond_bundle)
+        if ctx is None:
+            return None
+        return runner.step(ctx, x_t, t_value).to(device=device, dtype=dtype)  # type: ignore[attr-defined]
+
     def velocity(
         self,
         x_t: torch.Tensor,
@@ -754,9 +939,14 @@ class _FastSamplerState:
         *,
         use_cfg: bool,
         step_index: int,
+        t_value: float | None = None,
     ) -> torch.Tensor:
         """Predict velocity for one Euler step. ``tt`` has shape (B,)."""
         mode = self.cfg_guidance_mode
+        if self.ane_active and mode == "independent" and t_value is not None:
+            v_ane = self._velocity_ane(x_t, tt, t_value, use_cfg=use_cfg)
+            if v_ane is not None:
+                return v_ane
         if use_cfg and self.enabled_cfg_names:
             if mode == "independent":
                 assert self.independent_bundle is not None
@@ -800,9 +990,10 @@ class _FastSamplerState:
         *,
         use_cfg: bool,
         step_index: int,
+        t_value: float | None = None,
     ) -> torch.Tensor:
         """One Euler step: x_{t+dt} = x_t + v(x_t, t) * dt. ``dt`` has shape (1,)."""
-        v = self.velocity(x_t, tt, use_cfg=use_cfg, step_index=step_index)
+        v = self.velocity(x_t, tt, use_cfg=use_cfg, step_index=step_index, t_value=t_value)
         if self.rescale_k is not None and self.rescale_sigma is not None:
             v = temporal_score_rescale_tensor(
                 v_pred=v,
@@ -847,7 +1038,9 @@ def _sample_euler_rf_cfg_fast(
     sway_coeff: float = -1.0,
     encoded_conditions: _Bundle | None = None,
     has_caption: bool | None = None,
+    opt: OptConfig | None = None,
 ) -> torch.Tensor:
+    opt = get_opt_config() if opt is None else opt
     device = model.device
     dtype = model.dtype
     batch_size = text_input_ids.shape[0]
@@ -1088,6 +1281,11 @@ def _sample_euler_rf_cfg_fast(
         rescale_sigma=rescale_sigma,
         latent_len=int(sequence_length),
         latent_mask=None,
+        ane_runner=get_ane_runner(model, opt) if opt.ane else None,
+        ane_gpu_branches=int(opt.ane_gpu_branches),
+        ane_gpu_cond=bool(opt.ane_gpu_cond),
+        ane_nocfg_gpu=bool(opt.ane_nocfg_gpu),
+        ane_candidates=bool(opt.ane_candidates),
     )
 
     # Precompute every attention mask this request can use up-front (one allocation
@@ -1102,7 +1300,7 @@ def _sample_euler_rf_cfg_fast(
         tt = t_model[i : i + 1].expand(batch_size)
         dt = dt_schedule[i : i + 1]
         use_cfg = bool(enabled_cfg_names) and (cfg_min_t <= t <= cfg_max_t)
-        x_t = state.step(x_t, tt, dt, use_cfg=use_cfg, step_index=i)
+        x_t = state.step(x_t, tt, dt, use_cfg=use_cfg, step_index=i, t_value=t)
 
         t_next = t_list[i + 1]
         if (
@@ -1120,6 +1318,16 @@ def _sample_euler_rf_cfg_fast(
                 )
             speaker_kv_active = False
 
+    if state.ane_runner is not None:
+        state.release()
+        stats = state.ane_runner.reset_stats()  # type: ignore[attr-defined]
+        if opt.ane_log:
+            used = "ane" if state.ane_active else "fallback:mps"
+            print(
+                f"[ane] {used} steps={stats['steps']} predict={stats['predict_sec'] * 1000:.0f} ms "
+                f"wait={stats['wait_sec'] * 1000:.0f} ms gpu_branches={state.ane_gpu_branches}",
+                flush=True,
+            )
     return x_t
 
 
@@ -1139,6 +1347,7 @@ def sample_euler_rf_cfg(
             *args,  # type: ignore[arg-type]
             encoded_conditions=encoded_conditions,
             has_caption=has_caption,
+            opt=opt,
             **kwargs,  # type: ignore[arg-type]
         )
     return _sample_euler_rf_cfg_legacy(model, *args, **kwargs)  # type: ignore[arg-type]

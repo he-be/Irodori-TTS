@@ -1980,6 +1980,9 @@ class InferenceRuntime:
         )
 
     def unload(self) -> None:
+        from .ane_dit import shutdown_ane_runner
+
+        shutdown_ane_runner(self.model)
         del self.model
         del self.tokenizer
         del self.codec

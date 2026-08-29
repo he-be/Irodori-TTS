@@ -8,6 +8,12 @@ import os as _os
 # Override with IRODORI_OPT_COMPILE_DIT=0 / IRODORI_OPT_COMPILE_CODEC=0 for a fast first request.
 _os.environ.setdefault("IRODORI_OPT_COMPILE_DIT", "1")
 _os.environ.setdefault("IRODORI_OPT_COMPILE_CODEC", "1")
+# RF step on the Neural Engine with the cond CFG branch on the GPU (13-ane.md). The first
+# start with an empty ~/.cache/irodori-tts/ane builds the Core ML packages (minutes);
+# `uv run python bench/build_ane.py --shapes full` does that ahead of time.
+_os.environ.setdefault("IRODORI_OPT_ANE", "1")
+_os.environ.setdefault("IRODORI_OPT_ANE_GPU_BRANCHES", "1")
+_os.environ.setdefault("IRODORI_OPT_ANE_SHAPES", "full")
 
 import argparse
 from datetime import datetime

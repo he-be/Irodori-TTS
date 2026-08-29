@@ -33,6 +33,19 @@ memory), the MPS backend, batch size 1. Every switch can be toggled through an
     IRODORI_OPT_LOAD_PARALLEL=0    load weights/tokenizer serially instead of overlapping them with
                                    the transformers import (default: overlapped)
     IRODORI_OPT_ROPE_REAL=0        use the complex-number RoPE instead of the real-valued one
+    IRODORI_OPT_ANE=1              run the RF step on the Neural Engine via Core ML (13-ane.md);
+                                   falls back to MPS per request when no enumerated shape fits
+    IRODORI_OPT_ANE_GPU_BRANCHES=1 with ANE on and independent CFG, run this many CFG branches
+                                   on the GPU concurrently with the ANE (0 = ANE only)
+    IRODORI_OPT_ANE_GPU_COND=0     give the GPU the tail (uncond) branch instead of the cond branch
+    IRODORI_OPT_ANE_NOCFG_GPU=1    run the no-CFG steps (t < cfg_min_t) on the GPU instead of the ANE
+    IRODORI_OPT_ANE_CANDIDATES=0   with num_candidates=2, do not split candidate 0 -> ANE, 1 -> GPU
+    IRODORI_OPT_ANE_SHAPES=dev|full enumerated shape set (default full; dev: 3 latent buckets x batch 1-3,
+                                   full: 23 buckets x 2 context profiles; first build is minutes)
+    IRODORI_OPT_ANE_UNITS=ne|all|gpu|cpu  Core ML compute units for the worker (default ne)
+    IRODORI_OPT_ANE_LOG=0          silence the [ane] load / per-request lines
+    IRODORI_OPT_ANE_CACHE_DIR=path where exported/compiled Core ML packages live
+                                   (default ~/.cache/irodori-tts/ane)
 
 The values are read once at first access.
 """
@@ -92,6 +105,14 @@ class OptConfig:
     prebake: bool = True
     load_parallel: bool = True
     rope_real: bool = True
+    ane: bool = False
+    ane_gpu_branches: int = 0
+    ane_gpu_cond: bool = True
+    ane_nocfg_gpu: bool = False
+    ane_candidates: bool = True
+    ane_shapes: str = "full"
+    ane_units: str = "ne"
+    ane_log: bool = True
 
     @classmethod
     def from_env(cls) -> OptConfig:
@@ -120,6 +141,14 @@ class OptConfig:
             prebake=_env_bool("IRODORI_OPT_PREBAKE", True),
             load_parallel=_env_bool("IRODORI_OPT_LOAD_PARALLEL", True),
             rope_real=_env_bool("IRODORI_OPT_ROPE_REAL", True),
+            ane=_env_bool("IRODORI_OPT_ANE", False),
+            ane_gpu_branches=max(0, _env_int("IRODORI_OPT_ANE_GPU_BRANCHES", 0)),
+            ane_gpu_cond=_env_bool("IRODORI_OPT_ANE_GPU_COND", True),
+            ane_nocfg_gpu=_env_bool("IRODORI_OPT_ANE_NOCFG_GPU", False),
+            ane_candidates=_env_bool("IRODORI_OPT_ANE_CANDIDATES", True),
+            ane_shapes=_env_str("IRODORI_OPT_ANE_SHAPES", "full", ("dev", "full")),
+            ane_units=_env_str("IRODORI_OPT_ANE_UNITS", "ne", ("ne", "all", "gpu", "cpu")),
+            ane_log=_env_bool("IRODORI_OPT_ANE_LOG", True),
         )
 
     def describe(self) -> str:

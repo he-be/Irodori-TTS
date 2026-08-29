@@ -138,6 +138,7 @@ def main() -> None:
     parser.add_argument("--ref", default=DEFAULT_REF)
     parser.add_argument("--inputs", nargs="+", default=["short", "medium", "long"])
     parser.add_argument("--num-steps", type=int, default=40)
+    parser.add_argument("--num-candidates", type=int, default=1)
     parser.add_argument("--cfg-guidance-mode", default="independent")
     parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument("--warmup", type=int, default=3)
@@ -192,6 +193,7 @@ def main() -> None:
             ref_wav=None if no_ref else args.ref,
             no_ref=no_ref,
             num_steps=int(args.num_steps),
+            num_candidates=int(args.num_candidates),
             cfg_guidance_mode=str(args.cfg_guidance_mode),
             seed=int(args.seed),
         )
