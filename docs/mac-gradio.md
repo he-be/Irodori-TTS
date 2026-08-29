@@ -205,6 +205,41 @@ request 単位でフォールバックします。Run Log の `rf step on ...` �
 
 落ちても出力は正しく、遅くなるだけです。
 
+### メモリとディスク（実測、2026-08-29）
+
+ANE 経路にしてもメモリは増えません。**増えるのはディスクだけ**です。
+
+fp16 / medium 入力 / warm 3 request / 参照キャッシュ有効。`ps` の RSS と `torch.mps`:
+
+| | ANE + GPU cond（既定） | MPS のみ（`IRODORI_OPT_ANE=0`） |
+|---|---:|---:|
+| 親プロセス RSS | 966〜1200 MiB | 1512 MiB |
+| ANE worker（子プロセス）RSS | 411〜427 MiB | — |
+| **ホスト RSS 合計** | **1402〜1625 MiB** | **1528 MiB** |
+| MPS `current_allocated` | 1668 MiB | 1668 MiB |
+| MPS `driver_allocated` | 2758 MiB | 2784 MiB |
+| `aned` / `ANECompilerService` | 9.5 / 4.5 MiB（起動前と同じ） | 同左 |
+
+- **GPU 側は 1 バイトも減りません**（1668 MiB で完全一致）。ANE を使ってもモデルは MPS に載ったままで、
+  cond 分岐・encoder・codec・フォールバックに要ります。ANE は GPU メモリの節約手段ではありません。
+- ホスト RSS は worker が 0.4 GB 増えるぶん親が減り、**合計の差は測定ゆらぎ（±0.2 GB）に埋もれます**。
+  親が減る理由は**未調査**。「ANE を使うと 0.4 GB 増える」とは言えません。
+- OS の ANE デーモン側にも常駐の増加は見えませんでした。
+
+ディスクは `~/.cache/irodori-tts/ane/` が **12 GB**（package あたり `.mlpackage` 699 MB +
+`.mlmodelc` 698 MB）。内訳は既定の `full` 形状 6 package = 8.4 GB と、`dev` 形状 3 package = 4.2 GB。
+`dev` は使っていないので消せば 4.2 GB 戻ります。**どれが `dev` かは横の `.json` で判別できます**
+（`shapes` が 3 個 = 192 / 320 / 768 のものが `dev`。`full` は 17〜23 個）:
+
+```bash
+python3 -c 'import json,pathlib
+for f in sorted(pathlib.Path.home().glob(".cache/irodori-tts/ane/*.json")):
+    n = len(json.load(f.open())["shapes"]); print("dev " if n == 3 else "full", n, f.stem)'
+```
+
+消すのは `dev` と出た stem の `.json` / `.mlpackage` / `.mlmodelc` の 3 つです。消したあと
+`IRODORI_OPT_ANE_SHAPES=dev` で起動すると、再エクスポート + 再コンパイルが走ります。
+
 ### 二重起動しない
 
 ポート違いで 2 アプリを同時に上げるのは問題ありませんが、**同じアプリを 2 つ起動しない**でください。
