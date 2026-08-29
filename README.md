@@ -197,7 +197,19 @@ uv run python gradio_app_voicedesign.py --server-name 0.0.0.0 --server-port 7861
 
 The same hosted v4-Small demo supports VoiceDesign and reference-audio conditioning.
 
-Both UIs default to `Aratako/Irodori-TTS-v4.1-Small`. `gradio_app_voicedesign.py` exposes
+For a long script (an article, a chapter) that does not fit in one request, use the
+longform UI:
+
+```bash
+uv run python gradio_app_longform.py --server-name 0.0.0.0 --server-port 7862
+```
+
+It splits the script into 7-12 second segments, generates them one after another, and joins
+them into a single wav. Each segment keeps its own text box and player: fix a misreading,
+press 再生成, and that segment plus the joined file are rebuilt. See
+[`docs/mac-gradio.md`](docs/mac-gradio.md) section 6.
+
+All three UIs default to `Aratako/Irodori-TTS-v4.1-Small`. `gradio_app_voicedesign.py` exposes
 caption conditioning, while `gradio_app.py` includes the Speaker Inversion input.
 
 ## Inference
@@ -524,6 +536,7 @@ Irodori-TTS/
 ├── infer.py                    # CLI inference
 ├── gradio_app.py               # Gradio web UI
 ├── gradio_app_voicedesign.py   # Gradio web UI for VoiceDesign checkpoints
+├── gradio_app_longform.py      # Gradio web UI for long scripts (split -> per-segment fixes)
 ├── prepare_manifest.py         # Dataset -> DACVAE latent preprocessing
 ├── convert_checkpoint_to_safetensors.py  # Checkpoint converter
 ├── quantize_checkpoint.py      # torchao checkpoint quantization
@@ -543,6 +556,7 @@ Irodori-TTS/
 │   ├── quantization.py         # torchao checkpoint serialization/load helpers
 │   ├── speaker_inversion.py    # Speaker Inversion embedding save/load helpers
 │   ├── text_normalization.py   # Japanese text normalization
+│   ├── text_segmentation.py    # Long-script splitting for the longform UI
 │   ├── optim.py                # Muon + AdamW optimizer
 │   └── progress.py             # Training progress tracker
 │

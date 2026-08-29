@@ -217,5 +217,8 @@ __marimo__/
 
 gradio_outputs/
 gradio_outputs_voicedesign/
+gradio_outputs_longform/
 outputs/
 data/
+
+.DS_Store
