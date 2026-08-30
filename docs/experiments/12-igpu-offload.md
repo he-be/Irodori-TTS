@@ -338,3 +338,26 @@ amdgpu の `mem_info_gtt_used` を記録）:
 4. codec decode の GEMM 形状（0.57 TFLOPS → 1.1 目標、長文 −3 s）
 
 これらで長文 12 step が RTF 0.8 台、16 step でも 1.0 前後に収まる見込み。
+
+### 13.2 carve-out に収まるかの事前検証（上限 3072 MB を GTT 上で再現）
+
+BIOS は非公式版で UMA を変更できないため、carve-out を使うなら **4096 − 表示 ≈ 850 MiB（表示は iGPU
+固定、dGPU は表示に使わない）= 約 3.2 GB** に収める必要がある。再起動せずに同じ制約を再現するため
+`IRODORI_OPT_VRAM_LIMIT_MB=3072`、decode chunk 96 で計測（`results/12_igpu_cap3072.json`,
+`12_igpu_stress_cap3072.json`）:
+
+| ケース | 結果 | peak alloc | reserved | GTT 実使用（allocator 外込み） |
+|---|---|---|---|---|
+| short / medium / long | ok、速度は上限なしと同じ（RTF 1.16 / 1.09 / 1.07） | 2.17 / 2.23 / 2.35 GB | 2.79 GB | – |
+| text_max / caption_max / caption_max_noref / ref15 / ref30 | ok | 2.31〜2.87 GB | 3.01〜3.07 GB | **3.38〜3.44 GB** |
+| worst（参照 30 s + text 256 + caption 512） | **OOM**（370 MiB の確保に失敗） | – | 3.07 GB | – |
+
+- torch の allocator の外に **約 370 MiB**（HIP ランタイム、rocBLAS / im2col の作業領域）が乗る。
+  つまり上限 3072 でも実使用は 3.4 GB で、carve-out の空き 3.2 GB には**入らない**。
+- HIP には GTT への自動はみ出しがない（KFD は VRAM の確保上限で ENOMEM を返す）ので、溢れたら
+  即 OOM。allocator 上限は **2.6 GB 程度**が必要で、現状の peak alloc（代表入力 2.35 GB、宣言上限
+  2.87 GB）より 0.3〜0.5 GB 削らないと成立しない。
+- 削り代（実験 13 のメモリ側）: ModernBERT text encoder（310M、fp16 0.6 GB）を CPU に置く
+  （1 リクエスト 1 回、数十トークンなので CPU でも 100〜200 ms）、decode chunk 64 / encode chunk
+  縮小で transient を削る、参照 30 s 上限。これで 2.6 GB 上限が見えたら `amdgpu.gttsize=4000` で
+  再起動して pool の切り替わりを確認する（失敗しても GTT 4 GB は表示に十分で、引数を外せば戻る）。

@@ -1,0 +1,86 @@
+{
+  "tag": "12_igpu_stress_cap3072",
+  "timestamp": "2026-08-30T10:14:03",
+  "git_commit": "2546ee6",
+  "env": {
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "torch": "2.9.1+rocm6.3",
+    "gpu": "AMD Radeon Graphics",
+    "env_overrides": [],
+    "alloc_conf": "expandable_segments:True"
+  },
+  "config": {
+    "precision": "fp16",
+    "codec_precision": "fp16",
+    "repeats": 1,
+    "graph_fill": 0,
+    "opt": "reuse_conditions=True crop_text=True fast_sampler=True cuda_graph=False graph_bucket=32 graph_max_entries=6 graph_max_static_mb=256 graph_shared_pool=False graph_max_latent_frames=384 graph_release_pool_on_evict=True graph_capture_after=1 codec_fold_weight_norm=True reference_cache=True reference_cache_entries=8 cpu_cast=True watermark=False text_bucket=16 speaker_bucket=64 compile_dit=False compile_codec=False decode_chunk_frames=96 decode_overlap_frames=16 decode_autocast_bf16=True codec_cudnn=auto encode_chunk_frames=96 encode_overlap_frames=32 vram_limit_mb=3072 empty_cache_after_request=False skip_init=True prebake=False load_parallel=True"
+  },
+  "load_sec": 5.305147874998511,
+  "cuda_mem_after_load": {
+    "allocated": 1784809984,
+    "reserved": 1811939328
+  },
+  "graph_after_fill": null,
+  "fill_errors": [],
+  "results": {
+    "text_max": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 37.33825437300402,
+      "wall_last": 37.33825437300402,
+      "max_allocated": 2423473664,
+      "max_reserved": 3221225472,
+      "private_pool": 0,
+      "smi_used_after": 3442
+    },
+    "caption_max": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 46.06623932900402,
+      "wall_last": 46.06623932900402,
+      "max_allocated": 3006429696,
+      "max_reserved": 3221225472,
+      "private_pool": 0,
+      "smi_used_after": 3384
+    },
+    "caption_max_noref": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 38.92687075499998,
+      "wall_last": 38.92687075499998,
+      "max_allocated": 2693341696,
+      "max_reserved": 3160408064,
+      "private_pool": 0,
+      "smi_used_after": 3384
+    },
+    "ref15": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 39.11065654899721,
+      "wall_last": 39.11065654899721,
+      "max_allocated": 2458286080,
+      "max_reserved": 3177185280,
+      "private_pool": 0,
+      "smi_used_after": 3400
+    },
+    "ref30": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 43.175869865001005,
+      "wall_last": 43.175869865001005,
+      "max_allocated": 2537012736,
+      "max_reserved": 3177185280,
+      "private_pool": 0,
+      "smi_used_after": 3400
+    },
+    "worst": {
+      "ok": false,
+      "error": "HIP out of memory. Tried to allocate 370.00 MiB. GPU 0 has a total capacity of 13.64 GiB of which 10.72 GiB is free. 3.00 GiB allowed; Of the allocated memory 2.48 GiB is allocated by PyTorch, and 170.53 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "max_allocated": 2744342016,
+      "max_reserved": 3177185280,
+      "private_pool": 0,
+      "smi_used_after": 3094
+    }
+  }
+}
