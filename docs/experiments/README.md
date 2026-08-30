@@ -75,6 +75,7 @@ uv run --no-sync python bench/bench_runtime.py \
 | `probe_igpu.py` | ROCm 下の iGPU プローブ: HIP 認識、同梱 Tensile arch、GEMM / conv1d / SDPA の実効 TFLOPS（12） |
 | `profile_codec_igpu.py` | codec decode の層別・カーネル別プロファイル（12） |
 | `profile_synth_igpu.py` | warm な synthesize 1 回のカーネル別プロファイル（12） |
+| `churn_igpu.py` | 長さの異なる入力を巡回する長時間 churn。OOM / reserved の成長 / amdgpu sysfs の実行中ピーク（12） |
 
 ロード用の道具は `prebake_runtime.py`（事前計算バンドルの生成 / `--list` / `--prune`、11 参照）。
 

@@ -396,3 +396,27 @@ stress（参照 ≤ 30 s の 6 ケース、chunk 96、`results/12_igpu_stress_te
   （`torch.cuda.mem_get_info()` の total が 13 963 → 4 096 MiB になり、`mem_info_vram_used` が増えれば成功）。
   聴感確認用: `outputs/exp12/12_igpu_tecpu_{short,long}.wav`（ModernBERT が fp32/CPU になる分、
   state はわずかに変わる）。
+
+### 13.4 上限テストの妥当性と長時間 churn
+
+上限（`set_per_process_memory_fraction`）を掛けた計測で `peak_reserved ≤ 上限` になるのは同語反復なので、
+根拠にしているのは (1) **OOM の有無**（上限に当たると allocator はキャッシュ解放→再試行→それでも不足なら
+HIP OOM を投げる。2304 で 2 ケース、TE=model の 3072 で worst が実際に落ちており反証可能）、
+(2) 上限と無関係な **`max_memory_allocated`**、(3) kernel 側から見た **`mem_info_gtt_used`**（torch の
+allocator 外の HIP ランタイム・コードオブジェクト・作業領域を含む実保持量）の 3 つ。
+
+残っていた穴「長時間実行での断片化」（09 では stress 通過後に 13 リクエスト目で OOM した前例）を
+`bench/churn_igpu.py` で埋める: 長さの異なる 6 種（short / text 256 / caption+no-ref / long / medium /
+text 256 + caption + 参照）を 6 周 = 36 リクエスト、上限 2560 + TE=cpu + chunk 96、GTT 使用量を 50 ms で
+サンプリングして**実行中のピーク**を取る（`results/12_igpu_churn_tecpu_cap2560.json`）:
+
+| 指標 | 値 |
+|---|---|
+| OOM | **0 / 36**（13.3 min） |
+| peak alloc（最大） | 1 755 MiB |
+| reserved | 6 リクエスト目で 2 452 MiB に達した後 **30 リクエスト横ばい**（成長なし） |
+| GTT 実行中ピーク | **2 854 MiB**（開始前ベースライン 86 MiB → TTS 分 ≈ 2.77 GB、allocator 外 ≈ 400 MiB） |
+
+- allocator 外のオーバーヘッドは一時的なものを含めても約 400 MiB で、stress 後の値と一致する。
+- 依然として未検証なのは **VRAM プールに切り替えた後の挙動**（allocator 外の量が同じか、表示側の
+  VRAM 使用量の変動でどこまで余白が削れるか）。これは `amdgpu.gttsize=4000` で再起動しないと分からない。
