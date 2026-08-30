@@ -361,3 +361,38 @@ BIOS は非公式版で UMA を変更できないため、carve-out を使うな
   （1 リクエスト 1 回、数十トークンなので CPU でも 100〜200 ms）、decode chunk 64 / encode chunk
   縮小で transient を削る、参照 30 s 上限。これで 2.6 GB 上限が見えたら `amdgpu.gttsize=4000` で
   再起動して pool の切り替わりを確認する（失敗しても GTT 4 GB は表示に十分で、引数を外せば戻る）。
+
+### 13.3 ModernBERT を CPU に置く（`IRODORI_OPT_TE_DEVICE=cpu`）
+
+BIOS（非公式版）で UMA を変えられないので、carve-out に入れるには TTS 側を約 3.2 GB
+（allocator 上限 ≈ 2.6 GB）に収める必要がある。text/caption 共用の ModernBERT backbone
+（310M、fp16 で 0.6 GB）を CPU fp32 に残し、射影後の state だけを DiT の device に送る。
+
+変更: `opt_config.text_encoder_device`（`IRODORI_OPT_TE_DEVICE=model|cpu`、既定 model）、
+`PretrainedTextBackbone.forward` が backbone の device で実行して結果を戻す、runtime の
+`_dit_dtype()` と `TextToLatentRFDiT.device/dtype` が backbone を飛ばして DiT の dtype/device を返す
+（`next(parameters())` が先頭登録の backbone を拾って fp32/CPU 扱いになる罠が 3 箇所あった）。
+dGPU の既定経路は音声 hash 一致で不変。
+
+| | TE=model（10 節） | **TE=cpu** |
+|---|---|---|
+| ロード後 alloc | 1 702 MiB | **1 092 MiB** |
+| peak alloc short / medium / long | 2 168 / 2 231 / 2 353 MiB | **1 558 / 1 621 / 1 743 MiB** |
+| RTF short / medium / long / caption | 1.16 / 1.09 / 1.07 / 1.08 | 1.17 / 1.09 / 1.07 / 1.13 |
+| predict_duration（text encode 込み） | 157 / 152 / 172 / 183 ms | 165 / 178 / 208 / 241 ms |
+
+stress（参照 ≤ 30 s の 6 ケース、chunk 96、`results/12_igpu_stress_tecpu_cap*.json`）:
+
+| allocator 上限 | 結果 | worst の peak alloc / reserved | HIP 実使用（GTT） |
+|---|---|---|---|
+| **2560 MB** | **6/6 ok** | 2 390 / 2 544 MiB | **2 952 MiB** |
+| 2304 MB | 4/6（caption_max, worst が OOM） | – | – |
+
+- CPU 側の ModernBERT は数十トークンなので +10〜80 ms。RTF への影響なし。
+- **carve-out 運用の候補構成**: `IRODORI_OPT_TE_DEVICE=cpu IRODORI_OPT_VRAM_LIMIT_MB=2560
+  IRODORI_OPT_DECODE_CHUNK=96` で HIP 実使用 ≈ 2.95 GB。carve-out の空き ≈ 3.2 GB（表示 850〜870 MiB）
+  に対し余白 ≈ 250 MiB。代表入力なら peak alloc 1.6〜1.7 GB でさらに余裕がある。
+- 残る未検証事項は **`amdgpu.gttsize=4000` で再起動したときに KFD のプールが本当に VRAM に切り替わるか**
+  （`torch.cuda.mem_get_info()` の total が 13 963 → 4 096 MiB になり、`mem_info_vram_used` が増えれば成功）。
+  聴感確認用: `outputs/exp12/12_igpu_tecpu_{short,long}.wav`（ModernBERT が fp32/CPU になる分、
+  state はわずかに変わる）。

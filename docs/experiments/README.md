@@ -139,5 +139,7 @@ IRODORI_OPT_DECODE_CHUNK=192 \
 - 精度は **fp16**（GFX9 に bf16 演算器がない）。codec の conv は自動で MIOpen を迂回する
   （`IRODORI_OPT_CODEC_CUDNN=auto`、dilated conv1d の素朴カーネル回避）。
 - sway 12 step で RTF ≈ 1.0〜1.1、reserved ≈ 3.6 GB。RTF < 1 が要るなら step 10（聴感で判断）。
-- メモリは carve-out ではなく GTT（通常 RAM）から取られる。carve-out を使わせるにはカーネル引数
-  `amdgpu.gttsize=4000` が要る（未検証、12 の 7 節）。
+- メモリは carve-out ではなく GTT（通常 RAM）から取られる。carve-out（空き ≈ 3.2 GB）を使わせるには
+  カーネル引数 `amdgpu.gttsize=4000` で再起動し（pool の切り替わりは未検証、12 の 7 節）、TTS 側を
+  `IRODORI_OPT_TE_DEVICE=cpu IRODORI_OPT_VRAM_LIMIT_MB=2560 IRODORI_OPT_DECODE_CHUNK=96` に絞る
+  （HIP 実使用 ≈ 2.95 GB、参照 30 s 上限の stress を全通過。12 の 13.3 節）。

@@ -383,6 +383,15 @@ def _move_inference_module(
     return module
 
 
+def _dit_dtype(model: torch.nn.Module) -> torch.dtype:
+    """dtype of the DiT itself, skipping the pretrained text backbone (which may be kept on
+    the CPU in fp32 via IRODORI_OPT_TE_DEVICE=cpu and is registered first)."""
+    for name, param in model.named_parameters():
+        if not name.startswith("pretrained_text_backbone."):
+            return param.dtype
+    return next(model.parameters()).dtype
+
+
 def resolve_runtime_dtype(*, precision: str, device: torch.device) -> torch.dtype:
     mode = str(precision).strip().lower()
     if mode == "fp32":
@@ -862,7 +871,7 @@ class InferenceRuntime:
             # SilentCipher model in VRAM and ~40-170 ms per request).
             self.watermarker = SilentCipherWatermarker.disabled()
         self._infer_lock = threading.Lock()
-        self._model_dtype = next(self.model.parameters()).dtype
+        self._model_dtype = _dit_dtype(self.model)
         self._lora_adapter_names: dict[str, str] = {}
         self._graph_runner = None
         self._active_variant = "base"
@@ -1056,6 +1065,12 @@ class InferenceRuntime:
                 if not opt.cpu_cast:
                     model = model.to(model_device)
                 model = _move_inference_module(model, device=model_device, dtype=model_dtype)
+        if opt.text_encoder_device == "cpu" and getattr(model, "pretrained_text_backbone", None) is not None:
+            # Keep ModernBERT on the CPU (fp32): it runs once per request on a few dozen tokens,
+            # and its ~0.6 GB of fp16 weights is what stands between the iGPU profile and the
+            # 4 GB UMA carve-out (docs/experiments/12, 13.2).
+            with _load_phase("text_backbone_to_cpu"):
+                model.pretrained_text_backbone.to(device="cpu", dtype=torch.float32)
         model.eval()
         model = _maybe_compile_inference_model(
             model,
@@ -1298,7 +1313,7 @@ class InferenceRuntime:
         batch_size: int,
         messages: list[str],
     ) -> tuple[torch.Tensor | None, torch.Tensor | None]:
-        runtime_dtype = next(self.model.parameters()).dtype
+        runtime_dtype = _dit_dtype(self.model)
         max_ref_seconds = (
             self.default_max_ref_seconds
             if req.max_ref_seconds is None
@@ -1507,7 +1522,7 @@ class InferenceRuntime:
                 "Use exactly one speaker conditioning source."
             )
 
-        runtime_dtype = next(self.model.parameters()).dtype
+        runtime_dtype = _dit_dtype(self.model)
         speaker_embedding = load_speaker_inversion_payload(req.ref_embed)["speaker_embedding"]
         state, mask = speaker_inversion_batch_tensors(
             speaker_embedding,

@@ -804,13 +804,23 @@ class PretrainedTextBackbone(nn.Module):
             parameter.requires_grad_(True)
 
     def forward(self, input_ids: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        # The backbone may live on another device than the DiT (IRODORI_OPT_TE_DEVICE=cpu,
+        # docs/experiments/12); run it where its weights are and bring the state back.
+        backbone_device = next(self.backbone.parameters()).device
+        out_device = input_ids.device
+        if backbone_device != out_device:
+            input_ids = input_ids.to(backbone_device)
+            mask = mask.to(backbone_device)
         outputs = self.backbone(
             input_ids=input_ids,
             attention_mask=mask,
             return_dict=True,
         )
         state = outputs.last_hidden_state
-        return state * mask.unsqueeze(-1).to(dtype=state.dtype)
+        state = state * mask.unsqueeze(-1).to(dtype=state.dtype)
+        if backbone_device != out_device:
+            state = state.to(out_device)
+        return state
 
     def set_gradient_checkpointing(self, enabled: bool) -> None:
         method_name = (
@@ -2180,10 +2190,17 @@ class TextToLatentRFDiT(nn.Module):
 
     @property
     def device(self) -> torch.device:
+        # Skip the pretrained text backbone: it may be kept on the CPU (IRODORI_OPT_TE_DEVICE=cpu).
+        for name, param in self.named_parameters():
+            if not name.startswith("pretrained_text_backbone."):
+                return param.device
         return next(self.parameters()).device
 
     @property
     def dtype(self) -> torch.dtype:
+        for name, param in self.named_parameters():
+            if not name.startswith("pretrained_text_backbone."):
+                return param.dtype
         return next(self.parameters()).dtype
 
     def as_dict(self) -> dict:

@@ -26,6 +26,9 @@ that A/B benchmarks can be run without code changes:
     IRODORI_OPT_DECODE_CHUNK=96    codec decode window in latent frames, 25 fps (0 = whole utterance)
     IRODORI_OPT_DECODE_OVERLAP=16  overlap per side in latent frames (receptive field ~10)
     IRODORI_OPT_DECODE_AUTOCAST=0  disable bf16 autocast for codec *decode* (default on; encode stays fp32)
+    IRODORI_OPT_TE_DEVICE=cpu      keep the pretrained text/caption backbone (ModernBERT, ~0.6 GB fp16) on
+                                   the CPU in fp32; only the projected states go to the model device
+                                   (default: model device). Frees VRAM at ~100-300 ms per request.
     IRODORI_OPT_CODEC_CUDNN=auto   cuDNN/MIOpen for codec convs: 1 = always, 0 = never (torch im2col+GEMM),
                                    auto = off on ROCm (MIOpen has only a naive kernel for dilated
                                    conv1d on gfx900, see docs/experiments/12)
@@ -105,6 +108,7 @@ class OptConfig:
     decode_overlap_frames: int = 16
     decode_autocast_bf16: bool = True
     codec_cudnn: str = "auto"
+    text_encoder_device: str = "model"
     encode_chunk_frames: int = 96
     encode_overlap_frames: int = 32
     vram_limit_mb: int = 3840
@@ -140,6 +144,7 @@ class OptConfig:
             decode_overlap_frames=max(0, _env_int("IRODORI_OPT_DECODE_OVERLAP", 16)),
             decode_autocast_bf16=_env_bool("IRODORI_OPT_DECODE_AUTOCAST", True),
             codec_cudnn=_env_choice("IRODORI_OPT_CODEC_CUDNN", "auto", {"auto", "0", "1"}),
+            text_encoder_device=_env_choice("IRODORI_OPT_TE_DEVICE", "model", {"model", "cpu"}),
             encode_chunk_frames=max(0, _env_int("IRODORI_OPT_ENCODE_CHUNK", 96)),
             encode_overlap_frames=max(0, _env_int("IRODORI_OPT_ENCODE_OVERLAP", 32)),
             vram_limit_mb=max(0, _env_int("IRODORI_OPT_VRAM_LIMIT_MB", 3840)),
