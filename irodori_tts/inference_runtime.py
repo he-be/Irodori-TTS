@@ -1076,6 +1076,10 @@ class InferenceRuntime:
             with _load_phase("adaln_stack"):
                 if not model.set_adaln_batching(True):
                     print("[runtime] adaln batching unavailable (non-plain AdaLN projections); using per-layer path", flush=True)
+        if opt.linear_fuse_enabled() and hasattr(model, "set_linear_fusion"):
+            with _load_phase("linear_fusion"):
+                if not model.set_linear_fusion(True):
+                    print("[runtime] linear fusion unavailable (non-plain DiT projections); using separate GEMMs", flush=True)
         model = _maybe_compile_inference_model(
             model,
             enabled=bool(key.compile_model),

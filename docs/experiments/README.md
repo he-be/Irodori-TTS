@@ -76,6 +76,7 @@ uv run --no-sync python bench/bench_runtime.py \
 | `profile_codec_igpu.py` | codec decode の層別・カーネル別プロファイル（12） |
 | `profile_synth_igpu.py` | warm な synthesize 1 回のカーネル別プロファイル（12） |
 | `churn_igpu.py` | 長さの異なる入力を巡回する長時間 churn。OOM / reserved の成長 / amdgpu sysfs の実行中ピーク（12） |
+| `sweep_linear_fusion.py` | DiT Linear 融合（qkvg / w1w3）の分割 vs 融合 GEMM 時間を M ごとに走査。`model.LINEAR_FUSION_SKIP_RANGES` の再生成用（13） |
 
 ロード用の道具は `prebake_runtime.py`（事前計算バンドルの生成 / `--list` / `--prune`、11 参照）。
 
@@ -142,9 +143,10 @@ IRODORI_OPT_TE_DEVICE=cpu IRODORI_OPT_VRAM_LIMIT_MB=2560 IRODORI_OPT_DECODE_CHUN
 - 精度は **fp16**（GFX9 に bf16 演算器がない）。codec の conv は自動で MIOpen を迂回する
   （`IRODORI_OPT_CODEC_CUDNN=auto`、dilated conv1d の素朴カーネル回避）。
 - ModernBERT (text/caption encoder) は CPU に置く（`IRODORI_OPT_TE_DEVICE=cpu`、+10〜80 ms）。
-- AdaLN の低ランク射影は ROCm では自動で全層バッチ化される（`IRODORI_OPT_ADALN_BATCH=auto`、13 参照、
-  −0.25 s/リクエスト）。dGPU では hash 不変を優先して既定 off。
-- sway 12 step で RTF **0.98〜1.06**（carve-out は GTT より 8〜10% 速い）。VRAM 実使用は代表入力で
-  2.7 GB、参照 30 s 上限の worst で 3.0 GB。stress 6/6・churn 18/18 通過（12 の 15 節）。
+- DiT の AdaLN 射影バッチ化と Linear 融合（`IRODORI_OPT_ADALN_BATCH` / `IRODORI_OPT_LINEAR_FUSE` = auto）は
+  ROCm では既定 on、dGPU では hash 不変を優先して既定 off（13 参照、合わせて −0.45 s/リクエスト）。
+- sway 12 step で RTF **short 0.98 / medium 0.94 / long 1.01 / caption 0.96**（12 の carve-out 構成 + 13。
+  carve-out は GTT より 8〜10% 速い）。VRAM 実使用は代表入力で 2.7 GB、参照 30 s 上限の worst で 3.0 GB。
+  stress 6/6・churn 18/18 通過（12 の 15 節）。
 - carve-out を使わない（`gttsize` 未指定の）場合は `IRODORI_OPT_VRAM_LIMIT_MB=3840 IRODORI_OPT_DECODE_CHUNK=192`
   で GTT 上でも動く（RTF 1.02〜1.12、通常 RAM を 3.3 GB 消費。12 の 10〜12 節）。

@@ -1,16 +1,16 @@
-# 13. iGPU の DiT 高速化 (1): AdaLN 低ランク射影のバッチ化
+# 13. iGPU の DiT 高速化: AdaLN 射影のバッチ化と Linear 融合
 
 ## 1. 目的 / 仮説
 
 実験 12 の carve-out 構成（iGPU fp16、sway 12 step、TE=cpu、上限 2560、chunk 96）は RTF が
 short 1.06 / medium 0.98 / long 1.03 で、1 を切りきれていない。step を減らすのは聴感で不可なので、
 **出力保持型**の変更だけで RTF < 1（12 step）、長文 16 step ≈ 1.0 を狙う。12 の 13.1 節のプロファイルから
-候補は次の 4 つ。本ノートはその 1 つ目。
+候補は次の 4 つ。本ノートは 1 つ目と 2 つ目（3 節〜5 節が AdaLN、8 節〜10 節が Linear 融合）。
 
 | 候補 | 根拠（12 の 13.1 節、short / long） | 見込み |
 |---|---|---|
-| **AdaLN 低ランク射影のバッチ化**（本ノート） | `3×1280 · 1280×192` 級の GEMM が 1 728 launch で 0.30 s。launch 律速（1 回 ~170 µs） | −0.3 s（固定、長さ無関係） |
-| DiT Linear の融合（wq/wk/wv/gate、w1/w3） | バッチ 1 の 4 step の GEMM が M=161 で 0.16〜0.62 TFLOPS | −0.3 s / −0.2 s（2 節） |
+| **AdaLN 低ランク射影のバッチ化**（3〜5 節） | `3×1280 · 1280×192` 級の GEMM が 1 728 launch で 0.30 s。launch 律速（1 回 ~170 µs） | −0.3 s（固定、長さ無関係） |
+| **DiT Linear の融合**（wq/wk/wv/gate、w1/w3、8〜10 節） | バッチ 1 の 4 step の GEMM が M=161 で 0.16〜0.62 TFLOPS | −0.3 s / −0.2 s（2 節） |
 | 長文の GEMM 以外 7.5 s の分解 | softmax fp32 化・cast・elementwise が T に比例 | 長文の本丸 |
 | codec decode の GEMM 形状 | im2col + GEMM が 0.57 TFLOPS（microbench 1.1） | 長文 −3 s |
 
@@ -114,9 +114,73 @@ DiT 1 step 単位で切り分けると:
 |---|---|
 | AdaLN 射影のバッチ化（`IRODORI_OPT_ADALN_BATCH=auto`） | **採用**。ROCm では既定 on（−0.25〜0.28 s）、CUDA では既定 off（hash 不変。`=1` で強制可） |
 
-## 7. 次
+## 7. Linear 融合の M 依存性: rocBLAS のカーネル選択は M に対して不連続
 
-1. Linear 融合（wq/wk/wv/gate → 1 本、w1/w3 → 1 本、M による分岐付き）。dGPU では同じ理由で
-   bit 一致が崩れる可能性が高い（N が変わるとカーネルが変わる）ので、同様に ROCm 限定の auto にする。
-2. 長文の GEMM 以外 7.5 s の分解（`bench/profile_synth_igpu.py --input long`）。
-3. codec decode の GEMM 形状。
+2 節の microbench は `x @ W`（(K, N) 配置）だったが、`nn.Linear` は `F.linear(x, W)`（(N, K) 配置）なので
+測り直した（`bench/sweep_linear_fusion.py`、fp16、M = 64〜2400 を 32 刻み + 境界を 8 刻み）。
+
+| M（= B × T） | qkvg 4 本 → 1 本 | w1/w3 2 本 → 1 本 | 現れる入力 |
+|---|---|---|---|
+| 56〜184 | **+48〜57%** | 96〜192 で **+19〜40%**、95 以下は −14〜19% | short のバッチ 1 step（T=161） |
+| 192〜392 | +5〜6% | 200〜359 で **−18〜24%**、360 以上 +1% | medium のバッチ 1（T=272） |
+| 392〜576 | +1〜2% | +1〜2% | short のバッチ 3（483） |
+| 584〜856 | +1〜3% | **+17〜23%** | long のバッチ 1（719）、medium のバッチ 3（816） |
+| 864〜1216 | +18〜23% | **−25%** | |
+| 1224〜1631 | **−21〜26%** | **−23〜29%** | |
+| 1632〜2111 | +1% | **−25%** | |
+| 2112〜 | +1% | +1% | long のバッチ 3（2157） |
+
+- 融合すると N が 1280 → 5120、3680 → 7360 になり、rocBLAS (Tensile, gfx900) が選ぶカーネルが変わる。
+  その良し悪しが M の範囲ごとに ±25% で反転し、パディング（M を 64 / 128 の倍数に）では直らない
+  （M=1400 → 1408 でも同じ）。分割側も M=161 が M=272 より遅いなど不連続。
+- 全域を融合すると w1/w3 は合計で**損**（走査全体 1 327 → 1 497 ms）。範囲ごとに速い方を選ぶ
+  「best-of」なら得（1 299 ms）。
+- この PC 専用（移植性は放棄済み、torch 2.9.1+rocm6.3 固定）なので、**融合が損になる M の範囲を静的な表**
+  にして分岐する: `model.LINEAR_FUSION_SKIP_RANGES = {"qkvg": [1217, 1631], "w1w3": [0, 95], [193, 359], [864, 2111]}`。
+  境界には 8 刻みの余白を取り、不明な側は分割（= 従来どおり）に倒している。rocBLAS を更新したら
+  `sweep_linear_fusion.py` で表を作り直す。
+
+## 8. 変更内容: wq/wk/wv/gate と w1/w3 の融合（M の範囲表で分岐）
+
+- `model._FusedLinearGroup`: bias なしで同じ入力を取る `nn.Linear` 群の weight を行方向に連結した
+  1 本の (ΣN, K) tensor を作り、各 Linear の `weight.data` をその**行スライス（連続ビュー）**に付け替える
+  （メモリ増なし、`state_dict` 不変）。`__call__(x)` は M = B × T が skip 範囲なら `None`（呼び側が
+  従来の分割経路を使う）、そうでなければ 1 回の `F.linear` の出力を `torch.split` したビューを返す。
+  後段の `reshape(B, T, heads, head_dim)` と `silu(h1) * h3` はビューのまま動く（コピーなし）。
+- `JointAttention.forward`: `_fused_qkvg` があれば q / k / v / gate を一度に作る（gate は後で
+  `sigmoid` に使う。fast 経路・legacy 経路とも）。`SwiGLU.forward`: `_fused_w13`。
+- `TextToLatentRFDiT.set_linear_fusion(enabled, skip_ranges=None)`: 全 block 一括（1 つでも素の
+  `nn.Linear` でなければ全体を無効化）。呼び出しごとに `data_ptr` で aliasing を確認し、`.to()` や
+  LoRA で崩れていれば分割経路に落ちる（`torch.compile` 中は確認を省く）。
+- `IRODORI_OPT_LINEAR_FUSE=auto|0|1`（既定 auto = ROCm のみ。理由は 4 節と同じ: N が変わればカーネルが
+  変わり、dGPU の hash 一致が崩れる）。runtime はロード後に `set_adaln_batching` の次に呼ぶ。
+
+## 9. 等価性と結果
+
+- 単体（CPU fp32、小構成、skip 範囲なしで全 M 融合）: 出力 **max abs diff 0.0**。skip 範囲の判定、
+  `.to()` 後の fallback（出力は分割経路と一致）、`state_dict` の往復も確認。
+- dGPU 既定（auto → off）: fp32 の hash が変更前と一致（short `c335d5b283d6`、caption_noref `f3c9e6fd374a`）。
+
+iGPU（carve-out 構成、fp16、sway 12、`results/13_igpu_fused.json`、AdaLN バッチ化と併用）:
+
+| 入力 | 12 の基準 wall / RTF | +AdaLN（5 節） | **+AdaLN +融合** | 基準からの差 | sample_rf |
+|---|---|---|---|---|---|
+| short (6.44 s) | 6.80 s / 1.056 | 6.55 s / 1.017 | **6.33 s / 0.984** | **−0.47 s** | 4.78 → 4.31 s |
+| medium (10.88 s) | 10.68 s / 0.982 | – | **10.22 s / 0.939** | **−0.46 s** | 7.31 → 6.84 s |
+| long (28.76 s) | 29.48 s / 1.025 | 29.20 s / 1.015 | **29.05 s / 1.010** | −0.43 s | 20.53 → 20.12 s |
+| caption_noref (7.32 s) | 7.52 s / 1.027 | – | **7.00 s / 0.957** | **−0.52 s** | 5.22 → 4.71 s |
+
+- 融合分は short −0.22 s、long −0.15 s、medium ≈ −0.2 s で、7 節の表からの試算（short 0.23 / medium 0.26 /
+  long 0.23）どおり。peak alloc は不変（1 558〜1 744 MiB）。
+- **short / medium / caption は RTF < 1** になった。long は 1.01 で、16 step なら ≈ 1.3 のまま。
+
+## 10. 採否と終了判断
+
+| 項目 | 採否 |
+|---|---|
+| AdaLN 射影のバッチ化（`IRODORI_OPT_ADALN_BATCH=auto`） | **採用**（ROCm 既定 on、CUDA 既定 off） |
+| Linear 融合 + M 範囲表（`IRODORI_OPT_LINEAR_FUSE=auto`、`LINEAR_FUSION_SKIP_RANGES`） | **採用**（同上）。この PC の rocBLAS 前提の表なので、環境を変えたら `sweep_linear_fusion.py` で再測定 |
+| 長文の GEMM 以外 7.5 s の分解、codec decode の GEMM 形状（1 節の候補 3・4） | **着手せず**。ユーザー判断（2026-08-30）: 1 件あたり −0.2〜0.3 s の積み上げでは割に合わないので、やりかけの融合までで打ち切り |
+
+iGPU の最終動作点（12 の 15.3 節の構成に本ノートの 2 つが既定で乗る）: sway 12 step で
+**RTF short 0.98 / medium 0.94 / long 1.01 / caption 0.96**、VRAM 実使用 ≈ 2.7〜3.0 GB。

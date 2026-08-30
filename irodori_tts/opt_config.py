@@ -37,6 +37,9 @@ that A/B benchmarks can be run without code changes:
                                    (launch-bound iGPU; on CUDA the graph already hides the launches
                                    and bmm differs from the M=1 gemv path at fp32 eps, see
                                    docs/experiments/13)
+    IRODORI_OPT_LINEAR_FUSE=auto   DiT wq/wk/wv/gate and w1/w3 as one GEMM each, except for the row
+                                   counts where rocBLAS makes that slower (model.LINEAR_FUSION_SKIP_RANGES);
+                                   auto = 1 on ROCm only (docs/experiments/13)
     IRODORI_OPT_ENCODE_CHUNK=96    reference encode window in latent frames (0 = whole clip)
     IRODORI_OPT_ENCODE_OVERLAP=32  overlap per side for reference encode
     IRODORI_OPT_VRAM_LIMIT_MB=3840 hard cap for the torch caching allocator (0 = none); CUDA context (~0.5 GB) is extra
@@ -115,6 +118,7 @@ class OptConfig:
     codec_cudnn: str = "auto"
     text_encoder_device: str = "model"
     adaln_batch: str = "auto"
+    linear_fuse: str = "auto"
     encode_chunk_frames: int = 96
     encode_overlap_frames: int = 32
     vram_limit_mb: int = 3840
@@ -152,6 +156,7 @@ class OptConfig:
             codec_cudnn=_env_choice("IRODORI_OPT_CODEC_CUDNN", "auto", {"auto", "0", "1"}),
             text_encoder_device=_env_choice("IRODORI_OPT_TE_DEVICE", "model", {"model", "cpu"}),
             adaln_batch=_env_choice("IRODORI_OPT_ADALN_BATCH", "auto", {"auto", "0", "1"}),
+            linear_fuse=_env_choice("IRODORI_OPT_LINEAR_FUSE", "auto", {"auto", "0", "1"}),
             encode_chunk_frames=max(0, _env_int("IRODORI_OPT_ENCODE_CHUNK", 96)),
             encode_overlap_frames=max(0, _env_int("IRODORI_OPT_ENCODE_OVERLAP", 32)),
             vram_limit_mb=max(0, _env_int("IRODORI_OPT_VRAM_LIMIT_MB", 3840)),
@@ -161,14 +166,21 @@ class OptConfig:
             load_parallel=_env_bool("IRODORI_OPT_LOAD_PARALLEL", True),
         )
 
-    def adaln_batch_enabled(self) -> bool:
-        if self.adaln_batch == "1":
+    @staticmethod
+    def _rocm_only(value: str) -> bool:
+        if value == "1":
             return True
-        if self.adaln_batch == "0":
+        if value == "0":
             return False
         import torch  # local: keep this module import-light
 
         return bool(getattr(torch.version, "hip", None))
+
+    def adaln_batch_enabled(self) -> bool:
+        return self._rocm_only(self.adaln_batch)
+
+    def linear_fuse_enabled(self) -> bool:
+        return self._rocm_only(self.linear_fuse)
 
     def codec_use_cudnn(self) -> bool:
         if self.codec_cudnn == "1":

@@ -231,6 +231,76 @@ class SelfAttention(nn.Module):
         return self.wo(y)
 
 
+# Row counts (M = batch * tokens) for which the fused GEMM is *slower* than the separate ones on
+# this PC's iGPU (rocBLAS gfx900, fp16); measured with bench/sweep_linear_fusion.py, see
+# docs/experiments/13. Outside these ranges fusion gains +1..57%.
+LINEAR_FUSION_SKIP_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
+    "qkvg": ((1217, 1631),),
+    "w1w3": ((0, 95), (193, 359), (864, 2111)),
+}
+
+
+class _FusedLinearGroup:
+    """Evaluate several bias-free nn.Linear layers that share an input as one GEMM.
+
+    The member weights are re-pointed at row slices of one stacked (sum N, K) tensor, so there is
+    no duplicate memory and state_dict / load_state_dict keep working. `__call__` returns the split
+    outputs (views), or None when the row count falls in a skip range or the aliasing was broken
+    (e.g. `.to()` replaced the parameters) — the caller then uses the per-layer path.
+    """
+
+    def __init__(self, linears: list[nn.Linear], skip_ranges: tuple[tuple[int, int], ...]):
+        self.linears = linears
+        self.sizes = [int(lin.out_features) for lin in linears]
+        self.skip_ranges = tuple(skip_ranges)
+        with torch.no_grad():
+            weight = torch.cat([lin.weight.detach() for lin in linears], dim=0)
+            offset = 0
+            for lin, n in zip(linears, self.sizes):
+                lin.weight.data = weight[offset : offset + n]
+                offset += n
+        self.weight = weight
+
+    @classmethod
+    def build(
+        cls, linears: list[nn.Linear], skip_ranges: tuple[tuple[int, int], ...]
+    ) -> "_FusedLinearGroup | None":
+        in_features = None
+        for lin in linears:
+            if type(lin) is not nn.Linear or lin.bias is not None:
+                return None
+            if type(lin.weight) is not nn.Parameter or type(lin.weight.data) is not torch.Tensor:
+                return None
+            if in_features is None:
+                in_features = int(lin.in_features)
+            elif int(lin.in_features) != in_features:
+                return None
+        return cls(linears, skip_ranges)
+
+    def valid(self) -> bool:
+        offset = 0
+        for lin, n in zip(self.linears, self.sizes):
+            if lin.weight.data_ptr() != self.weight[offset].data_ptr():
+                return False
+            offset += n
+        return True
+
+    def fuse_for(self, rows: int) -> bool:
+        for lo, hi in self.skip_ranges:
+            if lo <= rows <= hi:
+                return False
+        return True
+
+    def __call__(self, x: torch.Tensor) -> tuple[torch.Tensor, ...] | None:
+        rows = x.numel() // x.shape[-1]
+        if not self.fuse_for(rows):
+            return None
+        if not torch.compiler.is_compiling() and not self.valid():
+            return None
+        y = F.linear(x, self.weight)
+        return tuple(torch.split(y, self.sizes, dim=-1))
+
+
 class JointAttention(nn.Module):
     """
     Echo-style joint attention over latent self tokens + conditioning contexts.
@@ -269,6 +339,9 @@ class JointAttention(nn.Module):
             self.wv_caption = nn.Linear(int(caption_ctx_dim), dim, bias=False)
         self.gate = nn.Linear(dim, dim, bias=False)
         self.wo = nn.Linear(dim, dim, bias=False)
+        # Inference-only fused wq/wk/wv/gate GEMM (docs/experiments/13); set by
+        # TextToLatentRFDiT.set_linear_fusion(). Plain attribute: not a parameter or buffer.
+        self._fused_qkvg: _FusedLinearGroup | None = None
 
         self.q_norm = RMSNorm((self.heads, self.head_dim), eps=norm_eps)
         self.k_norm = RMSNorm((self.heads, self.head_dim), eps=norm_eps)
@@ -353,9 +426,14 @@ class JointAttention(nn.Module):
         attn_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         bsz, seq_len, _ = x.shape
-        q = self.wq(x).reshape(bsz, seq_len, self.heads, self.head_dim)
-        k_self = self.wk(x).reshape(bsz, seq_len, self.heads, self.head_dim)
-        v_self = self.wv(x).reshape(bsz, seq_len, self.heads, self.head_dim)
+        fused = self._fused_qkvg(x) if self._fused_qkvg is not None else None
+        if fused is not None:
+            q_lin, k_lin, v_lin, gate_lin = fused
+        else:
+            q_lin, k_lin, v_lin, gate_lin = self.wq(x), self.wk(x), self.wv(x), None
+        q = q_lin.reshape(bsz, seq_len, self.heads, self.head_dim)
+        k_self = k_lin.reshape(bsz, seq_len, self.heads, self.head_dim)
+        v_self = v_lin.reshape(bsz, seq_len, self.heads, self.head_dim)
         if attn_mask is not None and context_kv is not None:
             # Fast path: precomputed context K/V and a precombined (B,1,1,L) mask.
             # Key order must match the mask layout: [self, text, speaker?, caption?].
@@ -373,7 +451,7 @@ class JointAttention(nn.Module):
                 is_causal=False,
             ).transpose(1, 2)
             y = y.reshape(bsz, seq_len, self.dim)
-            y = y * torch.sigmoid(self.gate(x))
+            y = y * torch.sigmoid(gate_lin if gate_lin is not None else self.gate(x))
             return self.wo(y)
         if context_kv is None:
             projected = self.project_context_kv(
@@ -460,7 +538,7 @@ class JointAttention(nn.Module):
             is_causal=False,
         ).transpose(1, 2)
         y = y.reshape(bsz, seq_len, self.dim)
-        y = y * torch.sigmoid(self.gate(x))
+        y = y * torch.sigmoid(gate_lin if gate_lin is not None else self.gate(x))
         return self.wo(y)
 
 
@@ -470,8 +548,13 @@ class SwiGLU(nn.Module):
         self.w1 = nn.Linear(dim, hidden_dim, bias=False)
         self.w2 = nn.Linear(hidden_dim, dim, bias=False)
         self.w3 = nn.Linear(dim, hidden_dim, bias=False)
+        self._fused_w13: _FusedLinearGroup | None = None  # see JointAttention._fused_qkvg
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        fused = self._fused_w13(x) if self._fused_w13 is not None else None
+        if fused is not None:
+            h1, h3 = fused
+            return self.w2(F.silu(h1) * h3)
         return self.w2(F.silu(self.w1(x)) * self.w3(x))
 
 
@@ -1892,6 +1975,33 @@ class TextToLatentRFDiT(nn.Module):
                 )
             caption_state = self.caption_norm(caption_state)
         return text_state, text_mask, ref_state, ref_mask, caption_state, caption_mask
+
+    # ---- fused DiT Linears (inference) ----------------------------------------------------
+    def set_linear_fusion(
+        self,
+        enabled: bool,
+        skip_ranges: dict[str, tuple[tuple[int, int], ...]] | None = None,
+    ) -> bool:
+        """Fuse wq/wk/wv/gate and w1/w3 of every block into one GEMM each (docs/experiments/13).
+        Returns the effective state; all-or-nothing so the blocks stay consistent."""
+        for block in self.blocks:
+            block.attention._fused_qkvg = None
+            block.mlp._fused_w13 = None
+        if not enabled:
+            return False
+        ranges = skip_ranges if skip_ranges is not None else LINEAR_FUSION_SKIP_RANGES
+        groups = []
+        for block in self.blocks:
+            attn, mlp = block.attention, block.mlp
+            qkvg = _FusedLinearGroup.build([attn.wq, attn.wk, attn.wv, attn.gate], ranges["qkvg"])
+            w13 = _FusedLinearGroup.build([mlp.w1, mlp.w3], ranges["w1w3"])
+            if qkvg is None or w13 is None:
+                return False
+            groups.append((attn, qkvg, mlp, w13))
+        for attn, qkvg, mlp, w13 in groups:
+            attn._fused_qkvg = qkvg
+            mlp._fused_w13 = w13
+        return True
 
     # ---- batched AdaLN (inference) -------------------------------------------------------
     _ADALN_PARTS = ("shift", "scale", "gate")
