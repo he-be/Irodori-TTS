@@ -420,3 +420,81 @@ text 256 + caption + 参照）を 6 周 = 36 リクエスト、上限 2560 + TE=
 - allocator 外のオーバーヘッドは一時的なものを含めても約 400 MiB で、stress 後の値と一致する。
 - 依然として未検証なのは **VRAM プールに切り替えた後の挙動**（allocator 外の量が同じか、表示側の
   VRAM 使用量の変動でどこまで余白が削れるか）。これは `amdgpu.gttsize=4000` で再起動しないと分からない。
+
+## 14. 再起動後の再開手順（新しいセッション向けの引き継ぎ）
+
+**状況（2026-08-30 時点）**: 実験 12 は GTT 上での動作点まで完了し、carve-out（UMA 4 GB）を使う
+ための準備（TE=cpu、上限 2560 で churn 通過）も済んでいる。残っているのは **カーネル引数
+`amdgpu.gttsize=4000` で再起動して、KFD のメモリプールが VRAM（carve-out）に切り替わるかの実測**
+だけ。コミット済み（`84568e5` まで、main）。未コミットの作業はない。
+
+### 14.1 前提の確認（再起動直後に 1 回）
+
+```bash
+cat /proc/cmdline                      # amdgpu.gttsize=4000 が入っているか
+journalctl -k -b | grep -E 'amdgpu.*(VRAM|GTT) memory ready'   # 期待: "4096M of VRAM", "4000M of GTT"
+for f in mem_info_vram_used mem_info_gtt_total; do echo "$f=$(( $(cat /sys/class/drm/card2/device/$f)/1048576 )) MiB"; done
+# KFD が公開するプール（heap_type 1 のバンクの size が 4 GiB 台になっていれば切り替わっている）
+grep -E 'heap_type|size_in_bytes' /sys/class/kfd/kfd/topology/nodes/1/mem_banks/*/properties
+```
+
+- `card2` が amdgpu かどうかは `readlink /sys/class/drm/card2/device/driver` で確認（番号は変わり得る）。
+- 切り替わっていれば `torch.cuda.mem_get_info()` の total が **13 963 → 4 096 MiB** になる:
+
+```bash
+cd ~/dev/Irodori-TTS
+HSA_OVERRIDE_GFX_VERSION=9.0.0 .venv-rocm/bin/python -c "import torch; print([v//2**20 for v in torch.cuda.mem_get_info()])"
+```
+
+### 14.2 本番相当の確認（切り替わっていた場合）
+
+```bash
+export HSA_OVERRIDE_GFX_VERSION=9.0.0 IRODORI_OPT_CUDA_GRAPH=0 IRODORI_OPT_PREBAKE=0 \
+       IRODORI_OPT_TE_DEVICE=cpu IRODORI_OPT_VRAM_LIMIT_MB=2560 IRODORI_OPT_DECODE_CHUNK=96
+# 1) 代表入力（RTF と peak を 10 節 / 13.3 節と比較。RTF 1.07〜1.17、peak alloc 1.56〜1.74 GB が目安）
+.venv-rocm/bin/python bench/bench_runtime.py --device cuda --precision fp16 --codec-precision fp16 \
+  --num-steps 12 --t-schedule-mode sway --inputs short medium long caption_noref --warmup 1 --repeats 2 \
+  --tag 12_igpu_vram_final --output docs/experiments/results/12_igpu_vram_final.json
+# 2) 宣言上限入力（参照 ≤ 30 s）
+.venv-rocm/bin/python bench/stress_vram.py --precision fp16 --codec-precision fp16 --num-steps 12 \
+  --t-schedule-mode sway --repeats 1 --graph-fill 0 --cases text_max caption_max caption_max_noref ref15 ref30 worst \
+  --tag 12_igpu_vram_stress --output docs/experiments/results/12_igpu_vram_stress.json
+# 3) 長時間 churn（sysfs_peak_mib.vram が 3 700 MiB 前後まで上がり、gtt がほぼ動かなければ carve-out を使えている）
+.venv-rocm/bin/python bench/churn_igpu.py --rounds 3 --output docs/experiments/results/12_igpu_churn_vram.json
+```
+
+判定:
+- 3 本とも OOM なし → **carve-out 運用成立**。README の iGPU 節を「carve-out 運用」を既定に書き換え、
+  `IRODORI_OPT_TE_DEVICE=cpu IRODORI_OPT_VRAM_LIMIT_MB=2560 IRODORI_OPT_DECODE_CHUNK=96` を推奨構成にする。
+  結果を 15 節として追記し、`00-index.md` の 12 行目を更新する。
+- OOM が出る → allocator 外のオーバーヘッドか表示側 VRAM の変動が原因。`mem_info_vram_used` を
+  TTS 起動前後で控えて差分を出し、上限を 2432 / 2304 に下げて再試行（2304 は GTT 上では caption_max と
+  worst が落ちた。13.3 節）。それでも入らなければ decode chunk 64、参照 encode chunk 縮小、speaker
+  encoder の CPU 化の順に削る。
+- `mem_get_info` の total が 13 963 のまま → 引数が効いていない。`/proc/cmdline` を確認、
+  `/etc/default/grub` → `sudo update-grub` → 再起動をやり直す。kernel が `gttsize` を丸めている可能性も
+  あるので `journalctl -k -b | grep GTT` の実値を見る（4096 未満であればよい）。
+
+### 14.3 元に戻す
+
+```bash
+sudo sed -i 's/ amdgpu.gttsize=4000//' /etc/default/grub && sudo update-grub && sudo reboot
+```
+
+GTT 4 GB でも表示には十分なので、切り替えに失敗しても起動・表示に影響は出ない見込み。
+
+### 14.4 このあとの実験 13（速度）
+
+carve-out の件が片付いたら、13.1 節の優先順位（AdaLN 低ランク射影のバッチ化 → Linear 融合 →
+長文の GEMM 以外 7.5 s の分解 → codec の GEMM 形状）で RTF < 1（12 step）、長文 16 step ≈ 1.0 を狙う。
+すべて出力保持型なので dGPU では音声 hash 一致（bf16 は 02 の理由で FP32 で判定）を要求する。
+iGPU の独立 CFG 経路は `det=False` なので hash 比較は使えず、dGPU で判定する。
+
+### 14.5 環境メモ
+
+- `.venv-rocm`（24 GB、gitignore 済）: torch 2.9.1+rocm6.3 / torchaudio 2.9.1 / torchcodec 0.9.1。
+  壊れたら 4 節のコマンドで作り直す（rocm7.1 で `uv sync` → 6.3 に差し替え）。
+- `.venv`（cu128）は dGPU 用で無変更。dGPU の既定経路は本実験の変更後も音声 hash 一致。
+- `HSA_OVERRIDE_GFX_VERSION=9.0.0` を忘れると ROCm が gfx90c を認識せず `cuda.is_available()` が False になる。
+- `/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory` の警告は無害。
+- MIOpen の find-db は `~/.config/miopen/`（初回のみ数分の探索が走る）。
