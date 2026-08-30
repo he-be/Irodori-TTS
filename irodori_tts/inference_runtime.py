@@ -140,7 +140,7 @@ def list_available_runtime_precisions(device: str | torch.device) -> list[str]:
     resolved = resolve_runtime_device(device)
     if resolved.type in ("cuda", "xpu"):
         # Local default: bf16 first (Gradio picks choices[0]).
-        return ["bf16", "fp32"]
+        return ["bf16", "fp32", "fp16"] if resolved.type == "cuda" else ["bf16", "fp32"]
     return ["fp32"]
 
 
@@ -391,7 +391,12 @@ def resolve_runtime_dtype(*, precision: str, device: torch.device) -> torch.dtyp
         if device.type not in ("cuda", "xpu"):
             raise ValueError("precision='bf16' currently requires CUDA or XPU device.")
         return torch.bfloat16
-    raise ValueError(f"Unsupported precision={precision!r}. Expected one of: fp32, bf16.")
+    if mode == "fp16":
+        # Local addition for GPUs without bf16 (e.g. GFX9 iGPU under ROCm).
+        if device.type != "cuda":
+            raise ValueError("precision='fp16' currently requires a CUDA/ROCm device.")
+        return torch.float16
+    raise ValueError(f"Unsupported precision={precision!r}. Expected one of: fp32, bf16, fp16.")
 
 
 def resolve_cfg_scales(

@@ -72,10 +72,15 @@ uv run --no-sync python bench/bench_runtime.py \
 | `coexist_stress.py` | llama-swap の VLM と TTS の同居 stress（同時実行 / ロード churn / パイプライン、10） |
 | `coexist_tts_worker.py` | 同居 stress の TTS 側ワーカー（別プロセス = 本物の load/unload） |
 | `coexist_llama_swap.sh` | `config.yaml` を変更せず `--n-cpu-moe` を注入して llama-swap を起動（10） |
+| `probe_igpu.py` | ROCm 下の iGPU プローブ: HIP 認識、同梱 Tensile arch、GEMM / conv1d / SDPA の実効 TFLOPS（12） |
+| `profile_codec_igpu.py` | codec decode の層別・カーネル別プロファイル（12） |
+| `profile_synth_igpu.py` | warm な synthesize 1 回のカーネル別プロファイル（12） |
 
 ロード用の道具は `prebake_runtime.py`（事前計算バンドルの生成 / `--list` / `--prune`、11 参照）。
 
 最適化スイッチは `irodori_tts/opt_config.py` の `IRODORI_OPT_*` 環境変数（既定は全部 on、watermark は off）。
+`bench_runtime.py` / `stress_vram.py` は `--device cpu|cuda`、`--precision fp16`、
+`--num-steps N --t-schedule-mode sway` を受け付ける（12 で追加。ROCm の torch も `cuda` として見える）。
 
 ## 品質の扱い
 
@@ -117,3 +122,22 @@ IRODORI_OPT_CUDA_GRAPH=0 IRODORI_OPT_VRAM_LIMIT_MB=3072
 （reserved の頭打ちが 3458 → 2438 MiB）、代償は synth 1 発あたり +70 ms だけ。
 VLM 側は `NCMOE=11 ./bench/coexist_llama_swap.sh` で静的に 12.0 GB に固定する
 （`-fit on` のままだと load 時の空き容量しだいで VLM が 15.2 GB を掴み、TTS がロードできなくなる）。
+
+### iGPU (Radeon Vega 7 / ROCm) で動かすとき（12 参照）
+
+dGPU を VLM に明け渡し、TTS を CPU 内蔵の Vega 7 で回す構成。`.venv-rocm`（torch 2.9.1+rocm6.3 —
+gfx900 のカーネルを同梱する最後の wheel）を使い、gfx90c を gfx900 に偽装する。
+
+```bash
+HSA_OVERRIDE_GFX_VERSION=9.0.0 IRODORI_OPT_CUDA_GRAPH=0 IRODORI_OPT_VRAM_LIMIT_MB=3840 \
+IRODORI_OPT_DECODE_CHUNK=192 \
+  .venv-rocm/bin/python infer.py --hf-checkpoint Aratako/Irodori-TTS-v4.1-Small \
+  --model-device cuda --codec-device cuda --precision fp16 --codec-precision fp16 \
+  --num-steps 12 --t-schedule-mode sway --max-ref-seconds 30 --text ... --ref-wav ...
+```
+
+- 精度は **fp16**（GFX9 に bf16 演算器がない）。codec の conv は自動で MIOpen を迂回する
+  （`IRODORI_OPT_CODEC_CUDNN=auto`、dilated conv1d の素朴カーネル回避）。
+- sway 12 step で RTF ≈ 1.0〜1.1、reserved ≈ 3.6 GB。RTF < 1 が要るなら step 10（聴感で判断）。
+- メモリは carve-out ではなく GTT（通常 RAM）から取られる。carve-out を使わせるにはカーネル引数
+  `amdgpu.gttsize=4000` が要る（未検証、12 の 7 節）。

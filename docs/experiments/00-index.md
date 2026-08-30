@@ -13,3 +13,4 @@
 | 09 | [09-vram-safe-operating-point.md](09-vram-safe-operating-point.md) | 宣言上限入力での stress。参照 encode の chunk 化、CUDA Graph の static/pool 上限化 → **既定を 3072 MB に変更** | 完了（10 が更新） |
 | 10 | [10-vlm-coexistence.md](10-vlm-coexistence.md) | llama-swap の VLM との同居。`--n-cpu-moe` による静的な VRAM 配分、同時実行/ロード churn/パイプライン stress、**上限の既定を 3840 MB に修正** | 完了 |
 | 11 | [11-load-time.md](11-load-time.md) | ロード時間の分解。捨てる乱数初期化の除去、事前計算バンドル（prebake）、import 裏での並列ロード → **9.55 → 5.08 s** | 完了 |
+| 12 | [12-igpu-offload.md](12-igpu-offload.md) | iGPU (Vega 7 / gfx90c) への TTS オフロード。sway 12 step 前提、CPU ベースライン RTF 1.7〜1.9、ROCm 6.3 wheel + gfx900 偽装、MIOpen の dilated conv 回避 (decode 21.8 → 1.6 s)、**iGPU fp16 で RTF 1.02〜1.12 / 3.7 GB**。carve-out は kernel 仕様で不可視 (`amdgpu.gttsize` で回避可の見込み) | 完了（続き 13） |

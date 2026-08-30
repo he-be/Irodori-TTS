@@ -26,6 +26,9 @@ that A/B benchmarks can be run without code changes:
     IRODORI_OPT_DECODE_CHUNK=96    codec decode window in latent frames, 25 fps (0 = whole utterance)
     IRODORI_OPT_DECODE_OVERLAP=16  overlap per side in latent frames (receptive field ~10)
     IRODORI_OPT_DECODE_AUTOCAST=0  disable bf16 autocast for codec *decode* (default on; encode stays fp32)
+    IRODORI_OPT_CODEC_CUDNN=auto   cuDNN/MIOpen for codec convs: 1 = always, 0 = never (torch im2col+GEMM),
+                                   auto = off on ROCm (MIOpen has only a naive kernel for dilated
+                                   conv1d on gfx900, see docs/experiments/12)
     IRODORI_OPT_ENCODE_CHUNK=96    reference encode window in latent frames (0 = whole clip)
     IRODORI_OPT_ENCODE_OVERLAP=32  overlap per side for reference encode
     IRODORI_OPT_VRAM_LIMIT_MB=3840 hard cap for the torch caching allocator (0 = none); CUDA context (~0.5 GB) is extra
@@ -64,6 +67,18 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_choice(name: str, default: str, allowed: set[str]) -> str:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    val = str(raw).strip().lower()
+    if val in {"true", "on", "yes"}:
+        val = "1"
+    elif val in {"false", "off", "no"}:
+        val = "0"
+    return val if val in allowed else default
+
+
 @dataclass(frozen=True)
 class OptConfig:
     reuse_conditions: bool = True
@@ -89,6 +104,7 @@ class OptConfig:
     decode_chunk_frames: int = 96
     decode_overlap_frames: int = 16
     decode_autocast_bf16: bool = True
+    codec_cudnn: str = "auto"
     encode_chunk_frames: int = 96
     encode_overlap_frames: int = 32
     vram_limit_mb: int = 3840
@@ -123,6 +139,7 @@ class OptConfig:
             decode_chunk_frames=max(0, _env_int("IRODORI_OPT_DECODE_CHUNK", 96)),
             decode_overlap_frames=max(0, _env_int("IRODORI_OPT_DECODE_OVERLAP", 16)),
             decode_autocast_bf16=_env_bool("IRODORI_OPT_DECODE_AUTOCAST", True),
+            codec_cudnn=_env_choice("IRODORI_OPT_CODEC_CUDNN", "auto", {"auto", "0", "1"}),
             encode_chunk_frames=max(0, _env_int("IRODORI_OPT_ENCODE_CHUNK", 96)),
             encode_overlap_frames=max(0, _env_int("IRODORI_OPT_ENCODE_OVERLAP", 32)),
             vram_limit_mb=max(0, _env_int("IRODORI_OPT_VRAM_LIMIT_MB", 3840)),
@@ -131,6 +148,15 @@ class OptConfig:
             prebake=_env_bool("IRODORI_OPT_PREBAKE", True),
             load_parallel=_env_bool("IRODORI_OPT_LOAD_PARALLEL", True),
         )
+
+    def codec_use_cudnn(self) -> bool:
+        if self.codec_cudnn == "1":
+            return True
+        if self.codec_cudnn == "0":
+            return False
+        import torch
+
+        return not bool(getattr(torch.version, "hip", None))
 
     def describe(self) -> str:
         return " ".join(f"{f.name}={getattr(self, f.name)}" for f in fields(self))

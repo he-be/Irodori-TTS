@@ -1,0 +1,215 @@
+{
+  "tag": "12_igpu_final",
+  "timestamp": "2026-08-30T09:44:18",
+  "git_commit": "d824822",
+  "env": {
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "python": "3.10.20",
+    "torch": "2.9.1+rocm6.3",
+    "cuda": null,
+    "hip": "6.3.42134-a9a80e791",
+    "device": "cuda",
+    "gpu": "AMD Radeon Graphics",
+    "capability": [
+      9,
+      0
+    ],
+    "total_memory": 14641475584,
+    "threads": 6,
+    "env_overrides": []
+  },
+  "config": {
+    "checkpoint": "/home/mh/.cache/huggingface/hub/models--Aratako--Irodori-TTS-v4.1-Small/snapshots/2b28324dc263ed5e6638b3cf3dd94c82ead07b4b/model.safetensors",
+    "device": "cuda",
+    "codec_device": "cuda",
+    "cudnn_benchmark": false,
+    "precision": "fp16",
+    "codec_precision": "fp16",
+    "compile": false,
+    "compile_dynamic": false,
+    "num_steps": 12,
+    "t_schedule_mode": "sway",
+    "sway_coeff": -1.0,
+    "cfg_guidance_mode": "independent",
+    "cfg_scale": null,
+    "seed": 1234,
+    "warmup": 1,
+    "repeats": 3,
+    "ref": "/home/mh/dev/Irodori-TTS/outputs/sample.wav"
+  },
+  "load_sec": 5.053940609002893,
+  "warmup_sec_total": 57.43945818099746,
+  "cuda_mem_after_load": {
+    "allocated": 1784809984,
+    "reserved": 1811939328,
+    "max_allocated": 1784809984,
+    "max_reserved": 1811939328
+  },
+  "cuda_mem_after_warmup": {
+    "allocated": 1818436608,
+    "reserved": 3747610624,
+    "max_allocated": 3441420800,
+    "max_reserved": 3747610624
+  },
+  "results": {
+    "short": {
+      "audio_seconds": 6.44,
+      "wall_median": 7.233282025001245,
+      "wall_p95": 7.236871900000551,
+      "wall_min": 7.231612112998846,
+      "rtf_median": 1.1231804386647894,
+      "stages_median_ms": {
+        "tokenize_text": 0.40794000233290717,
+        "prepare_reference": 0.8334929952980019,
+        "predict_duration": 156.79951800120762,
+        "sample_rf": 5466.447568003787,
+        "unpatchify_latent": 0.013123993994668126,
+        "decode_latent": 1608.3608690023539
+      },
+      "audio_hashes": [
+        "0d83ccfb6d60abc0df06ee5cca0933f19cdcc04d9f53f7e65b17ab5e981ef5fe",
+        "503cd8d4a27cd63e0af1ed5f2aef94f0384ce2fff91bf8af53c1bac2235aa792",
+        "5631df78ccedf7b7b77816ad20b10dda8b11b1d860f861958480e2791958d97d"
+      ],
+      "deterministic": false,
+      "gpu_util": {
+        "smi_mem_used_max_mib": 864.0,
+        "mean": 99.0,
+        "median": 99.0,
+        "p10": 99.0,
+        "max": 99.0,
+        "n": 430.0
+      },
+      "cuda_mem_peak": {
+        "allocated": 1818436608,
+        "reserved": 3753902080,
+        "max_allocated": 2471667200,
+        "max_reserved": 3753902080
+      },
+      "messages": [
+        "info: reference loudness normalize enabled per clip (target_db=-16.00, includes peak safety scaling).",
+        "info: speaker state served from L2 cache.",
+        "info: predicted duration frames=160.5, scale=1.000, using_frames=161 (6.440s).",
+        "info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only)."
+      ]
+    },
+    "medium": {
+      "audio_seconds": 10.88,
+      "wall_median": 11.120318146997306,
+      "wall_p95": 11.124278100003721,
+      "wall_min": 11.118359020001662,
+      "rtf_median": 1.02208806498137,
+      "stages_median_ms": {
+        "tokenize_text": 0.4309229989303276,
+        "prepare_reference": 0.8236139983637258,
+        "predict_duration": 151.69021600013366,
+        "sample_rf": 8312.584145001892,
+        "unpatchify_latent": 0.014496996300294995,
+        "decode_latent": 2653.549488997669
+      },
+      "audio_hashes": [
+        "07d53d4170211d560aca9c9c74a50c215aecea9c7b38bb9ed32a633156fcf9a3"
+      ],
+      "deterministic": true,
+      "gpu_util": {
+        "smi_mem_used_max_mib": 864.0,
+        "mean": 99.0,
+        "median": 99.0,
+        "p10": 99.0,
+        "max": 99.0,
+        "n": 661.0
+      },
+      "cuda_mem_peak": {
+        "allocated": 1818436608,
+        "reserved": 3760193536,
+        "max_allocated": 2922028544,
+        "max_reserved": 3760193536
+      },
+      "messages": [
+        "info: reference loudness normalize enabled per clip (target_db=-16.00, includes peak safety scaling).",
+        "info: speaker state served from L2 cache.",
+        "info: predicted duration frames=272.4, scale=1.000, using_frames=272 (10.880s).",
+        "info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only)."
+      ]
+    },
+    "long": {
+      "audio_seconds": 28.76,
+      "wall_median": 29.278328143998806,
+      "wall_p95": 29.28084069599572,
+      "wall_min": 29.274400603004324,
+      "rtf_median": 1.0180225363003756,
+      "stages_median_ms": {
+        "tokenize_text": 0.7037780014798045,
+        "prepare_reference": 0.8743200014578179,
+        "predict_duration": 170.59852000238607,
+        "sample_rf": 21805.233345003217,
+        "unpatchify_latent": 0.014576995454262942,
+        "decode_latent": 7299.934082999243
+      },
+      "audio_hashes": [
+        "e9f150df5d8f0584772ef3c976547b0bcfd06a3396c90e020a9edb09dba82243"
+      ],
+      "deterministic": true,
+      "gpu_util": {
+        "smi_mem_used_max_mib": 864.0,
+        "mean": 99.0,
+        "median": 99.0,
+        "p10": 99.0,
+        "max": 99.0,
+        "n": 1739.0
+      },
+      "cuda_mem_peak": {
+        "allocated": 1818436608,
+        "reserved": 3764387840,
+        "max_allocated": 3441420800,
+        "max_reserved": 3764387840
+      },
+      "messages": [
+        "info: reference loudness normalize enabled per clip (target_db=-16.00, includes peak safety scaling).",
+        "info: speaker state served from L2 cache.",
+        "info: predicted duration frames=718.9, scale=1.000, using_frames=719 (28.760s).",
+        "info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only)."
+      ]
+    },
+    "caption_noref": {
+      "audio_seconds": 7.32,
+      "wall_median": 7.900222470998415,
+      "wall_p95": 7.902260606999334,
+      "wall_min": 7.897779940998589,
+      "rtf_median": 1.0792653648904937,
+      "stages_median_ms": {
+        "tokenize_text": 0.4243200019118376,
+        "prepare_reference": 0.10012900020228699,
+        "predict_duration": 183.35561500134645,
+        "sample_rf": 5958.836382997106,
+        "unpatchify_latent": 0.013725999451708049,
+        "decode_latent": 1756.7279139984748
+      },
+      "audio_hashes": [
+        "80b4ec30a8d48d40f4a92615fbaa9c0a1c1794bdf49aa90504fd1f3a9c12c625",
+        "c719d5c2cc9044771e9ebfb3917bf83530410a0e89362d7a053593693b00d903",
+        "f760ea12a26faa0b3b8bba701615fe98d82d89647f9fe227d38fcb7de1d1adc8"
+      ],
+      "deterministic": false,
+      "gpu_util": {
+        "smi_mem_used_max_mib": 864.0,
+        "mean": 99.0,
+        "median": 99.0,
+        "p10": 99.0,
+        "max": 99.0,
+        "n": 469.0
+      },
+      "cuda_mem_peak": {
+        "allocated": 1818436608,
+        "reserved": 3764387840,
+        "max_allocated": 2560942080,
+        "max_reserved": 3764387840
+      },
+      "messages": [
+        "info: speaker conditioning is disabled for this checkpoint or request; ignoring cfg_scale_speaker.",
+        "info: predicted duration frames=183.0, scale=1.000, using_frames=183 (7.320s).",
+        "info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only)."
+      ]
+    }
+  }
+}

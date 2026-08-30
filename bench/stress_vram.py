@@ -77,6 +77,15 @@ def _private_pool_bytes() -> int:
 
 
 def _smi_used() -> int:
+    if getattr(torch.version, "hip", None):
+        # ROCm iGPU: nvidia-smi would report the other card; read amdgpu GTT usage (docs/experiments/12).
+        for card in sorted(Path("/sys/class/drm").glob("card[0-9]")):
+            try:
+                if (card / "device" / "driver").resolve().name == "amdgpu":
+                    return int((card / "device" / "mem_info_gtt_used").read_text()) // 2**20
+            except OSError:
+                continue
+        return -1
     out = subprocess.run(
         ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
         capture_output=True,
@@ -91,8 +100,10 @@ def _smi_used() -> int:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--hf-checkpoint", default="Aratako/Irodori-TTS-v4.1-Small")
-    parser.add_argument("--precision", choices=["fp32", "bf16"], default="bf16")
-    parser.add_argument("--codec-precision", choices=["fp32", "bf16"], default="fp32")
+    parser.add_argument("--precision", choices=["fp32", "bf16", "fp16"], default="bf16")
+    parser.add_argument("--codec-precision", choices=["fp32", "bf16", "fp16"], default="fp32")
+    parser.add_argument("--num-steps", type=int, default=40)
+    parser.add_argument("--t-schedule-mode", choices=["linear", "sway"], default="linear")
     parser.add_argument("--ref", default=DEFAULT_REF)
     parser.add_argument("--tag", default="stress")
     parser.add_argument("--output", default=None)
@@ -182,7 +193,8 @@ def main() -> None:
             caption=spec.get("caption"),
             ref_wav=spec.get("ref_wav"),
             no_ref=bool(spec.get("no_ref", False)),
-            num_steps=40,
+            num_steps=int(args.num_steps),
+            t_schedule_mode=str(args.t_schedule_mode),
             seed=1234,
         )
 

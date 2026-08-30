@@ -1,0 +1,116 @@
+{
+  "tag": "12_igpu_stress",
+  "timestamp": "2026-08-30T09:50:29",
+  "git_commit": "d824822",
+  "env": {
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "torch": "2.9.1+rocm6.3",
+    "gpu": "AMD Radeon Graphics",
+    "env_overrides": [],
+    "alloc_conf": "expandable_segments:True"
+  },
+  "config": {
+    "precision": "fp16",
+    "codec_precision": "fp16",
+    "repeats": 1,
+    "graph_fill": 0,
+    "opt": "reuse_conditions=True crop_text=True fast_sampler=True cuda_graph=False graph_bucket=32 graph_max_entries=6 graph_max_static_mb=256 graph_shared_pool=False graph_max_latent_frames=384 graph_release_pool_on_evict=True graph_capture_after=1 codec_fold_weight_norm=True reference_cache=True reference_cache_entries=8 cpu_cast=True watermark=False text_bucket=16 speaker_bucket=64 compile_dit=False compile_codec=False decode_chunk_frames=384 decode_overlap_frames=16 decode_autocast_bf16=True codec_cudnn=auto encode_chunk_frames=96 encode_overlap_frames=32 vram_limit_mb=3840 empty_cache_after_request=False skip_init=True prebake=False load_parallel=True"
+  },
+  "load_sec": 5.37977361400408,
+  "cuda_mem_after_load": {
+    "allocated": 1784809984,
+    "reserved": 1811939328
+  },
+  "graph_after_fill": null,
+  "fill_errors": [],
+  "results": {
+    "text_max": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 35.690409328002715,
+      "wall_last": 35.690409328002715,
+      "max_allocated": 3441648640,
+      "max_reserved": 3772776448,
+      "private_pool": 0,
+      "smi_used_after": 3996
+    },
+    "caption_max": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 44.03537679799774,
+      "wall_last": 44.03537679799774,
+      "max_allocated": 3442069504,
+      "max_reserved": 3804233728,
+      "private_pool": 0,
+      "smi_used_after": 4026
+    },
+    "caption_max_noref": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 36.92972934000136,
+      "wall_last": 36.92972934000136,
+      "max_allocated": 3442074112,
+      "max_reserved": 3804233728,
+      "private_pool": 0,
+      "smi_used_after": 4026
+    },
+    "ref15": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 37.19904124500317,
+      "wall_last": 37.19904124500317,
+      "max_allocated": 3441805824,
+      "max_reserved": 3821010944,
+      "private_pool": 0,
+      "smi_used_after": 4042
+    },
+    "ref30": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 41.27439723999851,
+      "wall_last": 41.27439723999851,
+      "max_allocated": 3442119680,
+      "max_reserved": 3821010944,
+      "private_pool": 0,
+      "smi_used_after": 4042
+    },
+    "worst": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 45.860873960999015,
+      "wall_last": 45.860873960999015,
+      "max_allocated": 3442503680,
+      "max_reserved": 3821010944,
+      "private_pool": 0,
+      "smi_used_after": 4042
+    },
+    "ref60": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 48.012434101998224,
+      "wall_last": 48.012434101998224,
+      "max_allocated": 3442746368,
+      "max_reserved": 3823108096,
+      "private_pool": 0,
+      "smi_used_after": 4044
+    },
+    "ref120": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 65.81273144499573,
+      "wall_last": 65.81273144499573,
+      "max_allocated": 3444974592,
+      "max_reserved": 3823108096,
+      "private_pool": 0,
+      "smi_used_after": 4044
+    },
+    "worst_ref120": {
+      "ok": false,
+      "error": "HIP out of memory. Tried to allocate 500.00 MiB. GPU 0 has a total capacity of 13.64 GiB of which 9.83 GiB is free. 3.75 GiB allowed; Of the allocated memory 2.81 GiB is allocated by PyTorch, and 739.11 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+      "max_allocated": 3121205760,
+      "max_reserved": 3823108096,
+      "private_pool": 0,
+      "smi_used_after": 4044
+    }
+  }
+}

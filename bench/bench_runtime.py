@@ -133,6 +133,70 @@ class GpuUtilSampler:
         }
 
 
+class AmdSysfsSampler(GpuUtilSampler):
+    """Sample amdgpu utilization / VRAM from sysfs (ROCm has no nvidia-smi)."""
+
+    def __init__(self, card: str, interval_ms: int = 50) -> None:
+        super().__init__(interval_ms)
+        self.card = card
+        self._stop = threading.Event()
+
+    def start(self) -> None:
+        busy = Path(f"/sys/class/drm/{self.card}/device/gpu_busy_percent")
+        vram = Path(f"/sys/class/drm/{self.card}/device/mem_info_vram_used")
+        if not busy.exists():
+            return
+
+        def _reader() -> None:
+            while not self._stop.is_set():
+                try:
+                    u = int(busy.read_text().strip())
+                    m = int(vram.read_text().strip()) // (1024 * 1024)
+                    self.samples.append((time.perf_counter(), u, m))
+                except (OSError, ValueError):
+                    pass
+                self._stop.wait(self.interval_ms / 1000.0)
+
+        self._thread = threading.Thread(target=_reader, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2)
+
+
+def _amd_card_for_torch_device(device: torch.device) -> str | None:
+    """Best-effort: find the drm card whose driver is amdgpu (single-iGPU machine)."""
+    for card in sorted(Path("/sys/class/drm").glob("card[0-9]")):
+        drv = card / "device" / "driver"
+        try:
+            if drv.resolve().name == "amdgpu":
+                return card.name
+        except OSError:
+            continue
+    return None
+
+
+def _make_sampler(device: torch.device) -> GpuUtilSampler | None:
+    if device.type != "cuda":
+        return None
+    if getattr(torch.version, "hip", None):
+        card = _amd_card_for_torch_device(device)
+        return AmdSysfsSampler(card) if card else None
+    return GpuUtilSampler()
+
+
+def _sync(device: torch.device) -> None:
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+
+
+def _reset_peak(device: torch.device) -> None:
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
+
+
 def _audio_hash(audio: torch.Tensor) -> str:
     return hashlib.sha256(audio.detach().float().contiguous().cpu().numpy().tobytes()).hexdigest()
 
@@ -160,14 +224,21 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--hf-checkpoint", default="Aratako/Irodori-TTS-v4.1-Small")
     parser.add_argument("--checkpoint", default=None)
-    parser.add_argument("--precision", choices=["fp32", "bf16"], default="fp32")
-    parser.add_argument("--codec-precision", choices=["fp32", "bf16"], default="fp32")
+    parser.add_argument("--device", default="cuda", help="Model device (cuda, cpu). ROCm torch also reports cuda.")
+    parser.add_argument("--codec-device", default=None, help="Codec device (default: same as --device).")
+    parser.add_argument("--precision", choices=["fp32", "bf16", "fp16"], default="fp32")
+    parser.add_argument("--codec-precision", choices=["fp32", "bf16", "fp16"], default="fp32")
+    parser.add_argument("--threads", type=int, default=0, help="torch.set_num_threads for CPU runs (0 = default).")
+    parser.add_argument("--cudnn-benchmark", action="store_true", help="torch.backends.cudnn.benchmark=True (MIOpen: exhaustive find).")
     parser.add_argument("--compile", action="store_true")
     parser.add_argument("--compile-dynamic", action="store_true")
     parser.add_argument("--ref", default=DEFAULT_REF)
     parser.add_argument("--inputs", nargs="+", default=["short", "medium", "long"])
     parser.add_argument("--num-steps", type=int, default=40)
+    parser.add_argument("--t-schedule-mode", choices=["linear", "sway"], default="linear")
+    parser.add_argument("--sway-coeff", type=float, default=-1.0)
     parser.add_argument("--cfg-guidance-mode", default="independent")
+    parser.add_argument("--cfg-scale", type=float, default=None, help="Single scale for all conditions (needed for joint).")
     parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument("--warmup", type=int, default=3)
     parser.add_argument("--repeats", type=int, default=10)
@@ -192,21 +263,26 @@ def main() -> None:
     else:
         checkpoint = download_hf_checkpoint(args.hf_checkpoint)
 
-    device = torch.device("cuda")
-    torch.cuda.reset_peak_memory_stats(device)
+    device = torch.device(args.device)
+    codec_device_str = args.codec_device or args.device
+    if args.threads > 0:
+        torch.set_num_threads(int(args.threads))
+    if args.cudnn_benchmark:
+        torch.backends.cudnn.benchmark = True
+    _reset_peak(device)
     t_load0 = time.perf_counter()
     runtime = InferenceRuntime.from_key(
         RuntimeKey(
             checkpoint=checkpoint,
-            model_device="cuda",
+            model_device=args.device,
             model_precision=args.precision,
-            codec_device="cuda",
+            codec_device=codec_device_str,
             codec_precision=args.codec_precision,
             compile_model=bool(args.compile),
             compile_dynamic=bool(args.compile_dynamic),
         )
     )
-    torch.cuda.synchronize(device)
+    _sync(device)
     load_sec = time.perf_counter() - t_load0
     mem_after_load = _cuda_mem(device)
 
@@ -220,12 +296,15 @@ def main() -> None:
             ref_wav=None if no_ref else args.ref,
             no_ref=no_ref,
             num_steps=int(args.num_steps),
+            t_schedule_mode=str(args.t_schedule_mode),
+            sway_coeff=float(args.sway_coeff),
             cfg_guidance_mode=str(args.cfg_guidance_mode),
+            cfg_scale=args.cfg_scale,
             seed=int(args.seed),
         )
 
     results: dict[str, object] = {}
-    sampler = None if args.no_util else GpuUtilSampler()
+    sampler = None if args.no_util else _make_sampler(device)
     if sampler is not None:
         sampler.start()
 
@@ -234,23 +313,23 @@ def main() -> None:
     for name in args.inputs:
         for _ in range(int(args.warmup)):
             runtime.synthesize(make_request(name))
-    torch.cuda.synchronize(device)
+    _sync(device)
     warm_sec = time.perf_counter() - t_warm0
     mem_after_warm = _cuda_mem(device)
 
     for name in args.inputs:
         req = make_request(name)
-        torch.cuda.reset_peak_memory_stats(device)
+        _reset_peak(device)
         walls: list[float] = []
         stages: dict[str, list[float]] = {}
         hashes: set[str] = set()
         audio_seconds = 0.0
         t_start = time.perf_counter()
         for _ in range(int(args.repeats)):
-            torch.cuda.synchronize(device)
+            _sync(device)
             t0 = time.perf_counter()
             result = runtime.synthesize(req)
-            torch.cuda.synchronize(device)
+            _sync(device)
             walls.append(time.perf_counter() - t0)
             for sname, sec in result.stage_timings:
                 stages.setdefault(sname, []).append(float(sec))
@@ -301,19 +380,28 @@ def main() -> None:
             "python": platform.python_version(),
             "torch": torch.__version__,
             "cuda": torch.version.cuda,
-            "gpu": torch.cuda.get_device_name(device),
-            "capability": list(torch.cuda.get_device_capability(device)),
-            "total_memory": int(torch.cuda.get_device_properties(device).total_memory),
+            "hip": getattr(torch.version, "hip", None),
+            "device": str(device),
+            "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else platform.processor(),
+            "capability": list(torch.cuda.get_device_capability(device)) if device.type == "cuda" else None,
+            "total_memory": int(torch.cuda.get_device_properties(device).total_memory) if device.type == "cuda" else None,
+            "threads": torch.get_num_threads(),
             "env_overrides": list(args.env),
         },
         "config": {
             "checkpoint": checkpoint,
+            "device": args.device,
+            "codec_device": codec_device_str,
+            "cudnn_benchmark": bool(args.cudnn_benchmark),
             "precision": args.precision,
             "codec_precision": args.codec_precision,
             "compile": bool(args.compile),
             "compile_dynamic": bool(args.compile_dynamic),
             "num_steps": args.num_steps,
+            "t_schedule_mode": args.t_schedule_mode,
+            "sway_coeff": args.sway_coeff,
             "cfg_guidance_mode": args.cfg_guidance_mode,
+            "cfg_scale": args.cfg_scale,
             "seed": args.seed,
             "warmup": args.warmup,
             "repeats": args.repeats,

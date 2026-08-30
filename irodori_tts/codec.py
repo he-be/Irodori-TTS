@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import inspect
 import math
 import sys
@@ -278,8 +279,24 @@ class DACVAECodec:
             return mean
         return self.model.encode(waveform)  # (B, D, T)
 
+    @staticmethod
+    def _conv_backend_ctx():
+        """MIOpen on gfx900 falls back to a naive kernel for dilated conv1d (20x slower than
+        torch's own im2col+GEMM path); see docs/experiments/12-igpu-offload.md."""
+        if get_opt_config().codec_use_cudnn():
+            return contextlib.nullcontext()
+        return torch.backends.cudnn.flags(enabled=False)
+
+    def encode_waveform(self, *args, **kwargs) -> torch.Tensor:
+        with self._conv_backend_ctx():
+            return self._encode_waveform_impl(*args, **kwargs)
+
+    def decode_latent(self, *args, **kwargs) -> torch.Tensor:
+        with self._conv_backend_ctx():
+            return self._decode_latent_impl(*args, **kwargs)
+
     @torch.inference_mode()
-    def encode_waveform(
+    def _encode_waveform_impl(
         self,
         waveform: torch.Tensor,
         sample_rate: int,
@@ -379,7 +396,7 @@ class DACVAECodec:
         return encoded.transpose(1, 2).contiguous()  # (B, T, D)
 
     @torch.inference_mode()
-    def decode_latent(
+    def _decode_latent_impl(
         self,
         latent: torch.Tensor,
         *,
