@@ -1072,6 +1072,10 @@ class InferenceRuntime:
             with _load_phase("text_backbone_to_cpu"):
                 model.pretrained_text_backbone.to(device="cpu", dtype=torch.float32)
         model.eval()
+        if opt.adaln_batch_enabled() and hasattr(model, "set_adaln_batching"):
+            with _load_phase("adaln_stack"):
+                if not model.set_adaln_batching(True):
+                    print("[runtime] adaln batching unavailable (non-plain AdaLN projections); using per-layer path", flush=True)
         model = _maybe_compile_inference_model(
             model,
             enabled=bool(key.compile_model),

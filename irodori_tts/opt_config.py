@@ -32,6 +32,11 @@ that A/B benchmarks can be run without code changes:
     IRODORI_OPT_CODEC_CUDNN=auto   cuDNN/MIOpen for codec convs: 1 = always, 0 = never (torch im2col+GEMM),
                                    auto = off on ROCm (MIOpen has only a naive kernel for dilated
                                    conv1d on gfx900, see docs/experiments/12)
+    IRODORI_OPT_ADALN_BATCH=auto   DiT AdaLN low-rank projections: 1 = all 24 AdaLNs in two bmm
+                                   launches per step, 0 = layer by layer, auto = 1 on ROCm only
+                                   (launch-bound iGPU; on CUDA the graph already hides the launches
+                                   and bmm differs from the M=1 gemv path at fp32 eps, see
+                                   docs/experiments/13)
     IRODORI_OPT_ENCODE_CHUNK=96    reference encode window in latent frames (0 = whole clip)
     IRODORI_OPT_ENCODE_OVERLAP=32  overlap per side for reference encode
     IRODORI_OPT_VRAM_LIMIT_MB=3840 hard cap for the torch caching allocator (0 = none); CUDA context (~0.5 GB) is extra
@@ -109,6 +114,7 @@ class OptConfig:
     decode_autocast_bf16: bool = True
     codec_cudnn: str = "auto"
     text_encoder_device: str = "model"
+    adaln_batch: str = "auto"
     encode_chunk_frames: int = 96
     encode_overlap_frames: int = 32
     vram_limit_mb: int = 3840
@@ -145,6 +151,7 @@ class OptConfig:
             decode_autocast_bf16=_env_bool("IRODORI_OPT_DECODE_AUTOCAST", True),
             codec_cudnn=_env_choice("IRODORI_OPT_CODEC_CUDNN", "auto", {"auto", "0", "1"}),
             text_encoder_device=_env_choice("IRODORI_OPT_TE_DEVICE", "model", {"model", "cpu"}),
+            adaln_batch=_env_choice("IRODORI_OPT_ADALN_BATCH", "auto", {"auto", "0", "1"}),
             encode_chunk_frames=max(0, _env_int("IRODORI_OPT_ENCODE_CHUNK", 96)),
             encode_overlap_frames=max(0, _env_int("IRODORI_OPT_ENCODE_OVERLAP", 32)),
             vram_limit_mb=max(0, _env_int("IRODORI_OPT_VRAM_LIMIT_MB", 3840)),
@@ -153,6 +160,15 @@ class OptConfig:
             prebake=_env_bool("IRODORI_OPT_PREBAKE", True),
             load_parallel=_env_bool("IRODORI_OPT_LOAD_PARALLEL", True),
         )
+
+    def adaln_batch_enabled(self) -> bool:
+        if self.adaln_batch == "1":
+            return True
+        if self.adaln_batch == "0":
+            return False
+        import torch  # local: keep this module import-light
+
+        return bool(getattr(torch.version, "hip", None))
 
     def codec_use_cudnn(self) -> bool:
         if self.codec_cudnn == "1":

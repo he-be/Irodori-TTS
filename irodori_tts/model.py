@@ -110,19 +110,33 @@ class LowRankAdaLN(nn.Module):
         if self.gate_up.bias is not None:
             nn.init.zeros_(self.gate_up.bias)
 
-    def forward(
-        self, x: torch.Tensor, cond_embed: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    def compute_modulation(
+        self, cond_embed: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """(shift, scale, tanh(gate)) for this AdaLN; depends only on the timestep condition."""
         shift, scale, gate = cond_embed.chunk(3, dim=-1)
         shift = self.shift_up(self.shift_down(F.silu(shift))) + shift
         scale = self.scale_up(self.scale_down(F.silu(scale))) + scale
         gate = self.gate_up(self.gate_down(F.silu(gate))) + gate
+        return shift, scale, torch.tanh(gate)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        cond_embed: torch.Tensor,
+        modulation: tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        # `modulation` is the precomputed (shift, scale, tanh(gate)) from
+        # TextToLatentRFDiT._batched_adaln_modulations (all layers in two bmm launches).
+        if modulation is None:
+            shift, scale, gate = self.compute_modulation(cond_embed)
+        else:
+            shift, scale, gate = modulation
 
         x_dtype = x.dtype
         x = x.float()
         x = x * torch.rsqrt((x * x).mean(dim=-1, keepdim=True) + self.eps)
         x = x * (1.0 + scale) + shift
-        gate = torch.tanh(gate)
         return x.to(x_dtype), gate
 
 
@@ -1005,8 +1019,10 @@ class DiffusionBlock(nn.Module):
         self_mask: torch.Tensor | None = None,
         context_kv: tuple[torch.Tensor, ...] | None = None,
         attn_mask: torch.Tensor | None = None,
+        modulation: tuple[tuple[torch.Tensor, ...], tuple[torch.Tensor, ...]] | None = None,
     ) -> torch.Tensor:
-        h, attention_gate = self.attention_adaln(x, cond_embed)
+        attention_mod, mlp_mod = modulation if modulation is not None else (None, None)
+        h, attention_gate = self.attention_adaln(x, cond_embed, attention_mod)
         x = x + self.dropout(
             attention_gate
             * self.attention(
@@ -1024,7 +1040,7 @@ class DiffusionBlock(nn.Module):
             )
         )
 
-        h, mlp_gate = self.mlp_adaln(x, cond_embed)
+        h, mlp_gate = self.mlp_adaln(x, cond_embed, mlp_mod)
         x = x + self.dropout(mlp_gate * self.mlp(h))
         return x
 
@@ -1610,6 +1626,10 @@ class TextToLatentRFDiT(nn.Module):
         self.in_proj = nn.Linear(cfg.patched_latent_dim, cfg.model_dim)
         self.blocks = nn.ModuleList(DiffusionBlock(cfg) for _ in range(cfg.num_layers))
         self.gradient_checkpointing = False
+        # Inference-only: all AdaLN low-rank projections of all layers evaluated in two bmm
+        # launches per step (docs/experiments/13). Enabled via set_adaln_batching().
+        self._adaln_batch_enabled = False
+        self._adaln_stack: dict[str, object] | None = None
         self.out_norm = RMSNorm(cfg.model_dim, eps=cfg.norm_eps)
         self.out_proj = nn.Linear(cfg.model_dim, cfg.patched_latent_dim)
         # Echo/JAX training initializes decoder out projection to zero for stable early training.
@@ -1873,6 +1893,150 @@ class TextToLatentRFDiT(nn.Module):
             caption_state = self.caption_norm(caption_state)
         return text_state, text_mask, ref_state, ref_mask, caption_state, caption_mask
 
+    # ---- batched AdaLN (inference) -------------------------------------------------------
+    _ADALN_PARTS = ("shift", "scale", "gate")
+
+    def _adaln_modules(self) -> list[LowRankAdaLN]:
+        mods: list[LowRankAdaLN] = []
+        for block in self.blocks:
+            mods.append(block.attention_adaln)
+            mods.append(block.mlp_adaln)
+        return mods
+
+    def set_adaln_batching(self, enabled: bool) -> bool:
+        """Enable/disable the batched AdaLN path; returns the effective state."""
+        self._adaln_batch_enabled = bool(enabled)
+        self._adaln_stack = None
+        if self._adaln_batch_enabled:
+            self._adaln_stack = self._build_adaln_stack()
+            if self._adaln_stack is None:
+                self._adaln_batch_enabled = False
+        return self._adaln_batch_enabled
+
+    def _build_adaln_stack(self) -> dict[str, object] | None:
+        """Stack every AdaLN projection into [P, A, ...] tensors and re-point the nn.Linear
+        parameters at views of the stack (no duplicate memory). Returns None when any of the
+        projections is not a plain nn.Linear (peft LoRA wrapper, quantized weight, ...)."""
+        mods = self._adaln_modules()
+        linears: list[list[tuple[nn.Linear, nn.Linear]]] = []
+        for m in mods:
+            row = []
+            for part in self._ADALN_PARTS:
+                down = getattr(m, f"{part}_down")
+                up = getattr(m, f"{part}_up")
+                for lin in (down, up):
+                    if type(lin) is not nn.Linear or type(lin.weight) is not nn.Parameter:
+                        return None
+                    if type(lin.weight.data) is not torch.Tensor:
+                        return None
+                if down.bias is not None or up.bias is None:
+                    return None
+                row.append((down, up))
+            linears.append(row)
+        ref = linears[0][0][0].weight
+        rank, dim = ref.shape
+        num = len(mods)
+        parts = len(self._ADALN_PARTS)
+        kw = {"device": ref.device, "dtype": ref.dtype}
+        down_w = torch.empty(parts, num, rank, dim, **kw)
+        up_w = torch.empty(parts, num, dim, rank, **kw)
+        up_b = torch.empty(parts, num, dim, **kw)
+        with torch.no_grad():
+            for a, row in enumerate(linears):
+                for p, (down, up) in enumerate(row):
+                    if tuple(down.weight.shape) != (rank, dim) or tuple(up.weight.shape) != (dim, rank):
+                        return None
+                    down_w[p, a].copy_(down.weight)
+                    up_w[p, a].copy_(up.weight)
+                    up_b[p, a].copy_(up.bias)
+                    down.weight.data = down_w[p, a]
+                    up.weight.data = up_w[p, a]
+                    up.bias.data = up_b[p, a]
+        return {
+            "down_w": down_w,
+            "up_w": up_w,
+            "up_b": up_b,
+            "linears": linears,
+            "num": num,
+            "rank": rank,
+            "dim": dim,
+        }
+
+    def _adaln_stack_valid(self, stack: dict[str, object]) -> bool:
+        # Cheap per-step guard: the modules must still be the ones we stacked and their
+        # parameters must still alias the stack (module swap by peft, .to(), reload...).
+        mods = self._adaln_modules()
+        linears = stack["linears"]  # type: ignore[index]
+        if len(mods) != len(linears):
+            return False
+        down_w = stack["down_w"]  # type: ignore[index]
+        up_w = stack["up_w"]  # type: ignore[index]
+        up_b = stack["up_b"]  # type: ignore[index]
+        for a, (m, row) in enumerate(zip(mods, linears)):
+            for p, part in enumerate(self._ADALN_PARTS):
+                down, up = row[p]
+                if getattr(m, f"{part}_down") is not down or getattr(m, f"{part}_up") is not up:
+                    return False
+                if (
+                    down.weight.data_ptr() != down_w[p, a].data_ptr()
+                    or up.weight.data_ptr() != up_w[p, a].data_ptr()
+                    or up.bias.data_ptr() != up_b[p, a].data_ptr()
+                ):
+                    return False
+        return True
+
+    def _batched_adaln_modulations(
+        self, cond_embed: torch.Tensor
+    ) -> list[tuple[tuple[torch.Tensor, ...], tuple[torch.Tensor, ...]]] | None:
+        """All (attention, mlp) AdaLN modulations for every block from one cond_embed [B, 1, 3D].
+
+        Same math as LowRankAdaLN.compute_modulation, evaluated as one bmm for the down
+        projections (batch = 3 parts) and one baddbmm for the up projections (batch = 3 * A).
+        """
+        if not self._adaln_batch_enabled or self.training:
+            return None
+        stack = self._adaln_stack
+        if stack is None:
+            return None
+        if not torch.compiler.is_compiling() and not self._adaln_stack_valid(stack):
+            stack = self._adaln_stack = self._build_adaln_stack()
+            if stack is None:
+                self._adaln_batch_enabled = False
+                return None
+        down_w: torch.Tensor = stack["down_w"]  # type: ignore[assignment]
+        up_w: torch.Tensor = stack["up_w"]  # type: ignore[assignment]
+        up_b: torch.Tensor = stack["up_b"]  # type: ignore[assignment]
+        num: int = stack["num"]  # type: ignore[assignment]
+        rank: int = stack["rank"]  # type: ignore[assignment]
+        dim: int = stack["dim"]  # type: ignore[assignment]
+        parts = len(self._ADALN_PARTS)
+
+        bsz = cond_embed.shape[0]
+        cond = cond_embed.reshape(bsz, parts, dim).transpose(0, 1)  # [P, B, D]
+        act = F.silu(cond)
+        # down: [P, B, D] x [P, D, A*r] -> [P, B, A*r]
+        down = torch.bmm(act, down_w.reshape(parts, num * rank, dim).transpose(1, 2))
+        down = down.reshape(parts, bsz, num, rank).transpose(1, 2).reshape(parts * num, bsz, rank)
+        # up: bias + [PA, B, r] x [PA, r, D] -> [PA, B, D]
+        up = torch.baddbmm(
+            up_b.reshape(parts * num, 1, dim).expand(parts * num, bsz, dim),
+            down,
+            up_w.reshape(parts * num, dim, rank).transpose(1, 2),
+        )
+        mod = up.reshape(parts, num, bsz, dim) + cond.unsqueeze(1)  # residual, [P, A, B, D]
+        shift = mod[0].unsqueeze(2)  # [A, B, 1, D]
+        scale = mod[1].unsqueeze(2)
+        gate = torch.tanh(mod[2]).unsqueeze(2)
+        out = []
+        for a in range(0, num, 2):
+            out.append(
+                (
+                    (shift[a], scale[a], gate[a]),
+                    (shift[a + 1], scale[a + 1], gate[a + 1]),
+                )
+            )
+        return out
+
     def forward_with_encoded_conditions(
         self,
         x_t: torch.Tensor,
@@ -1896,6 +2060,7 @@ class TextToLatentRFDiT(nn.Module):
         use_checkpoint = self.gradient_checkpointing and self.training and context_kv_cache is None
         if attn_mask is not None and context_kv_cache is None:
             raise ValueError("attn_mask fast path requires context_kv_cache.")
+        modulations = None if use_checkpoint else self._batched_adaln_modulations(cond_embed)
         for i, block in enumerate(self.blocks):
             context_kv = context_kv_cache[i] if context_kv_cache is not None else None
             if use_checkpoint:
@@ -1927,6 +2092,7 @@ class TextToLatentRFDiT(nn.Module):
                     self_mask=latent_mask,
                     context_kv=context_kv,
                     attn_mask=attn_mask,
+                    modulation=modulations[i] if modulations is not None else None,
                 )
 
         x = self.out_norm(x)

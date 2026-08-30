@@ -142,6 +142,8 @@ IRODORI_OPT_TE_DEVICE=cpu IRODORI_OPT_VRAM_LIMIT_MB=2560 IRODORI_OPT_DECODE_CHUN
 - 精度は **fp16**（GFX9 に bf16 演算器がない）。codec の conv は自動で MIOpen を迂回する
   （`IRODORI_OPT_CODEC_CUDNN=auto`、dilated conv1d の素朴カーネル回避）。
 - ModernBERT (text/caption encoder) は CPU に置く（`IRODORI_OPT_TE_DEVICE=cpu`、+10〜80 ms）。
+- AdaLN の低ランク射影は ROCm では自動で全層バッチ化される（`IRODORI_OPT_ADALN_BATCH=auto`、13 参照、
+  −0.25 s/リクエスト）。dGPU では hash 不変を優先して既定 off。
 - sway 12 step で RTF **0.98〜1.06**（carve-out は GTT より 8〜10% 速い）。VRAM 実使用は代表入力で
   2.7 GB、参照 30 s 上限の worst で 3.0 GB。stress 6/6・churn 18/18 通過（12 の 15 節）。
 - carve-out を使わない（`gttsize` 未指定の）場合は `IRODORI_OPT_VRAM_LIMIT_MB=3840 IRODORI_OPT_DECODE_CHUNK=192`
