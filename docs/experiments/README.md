@@ -150,3 +150,26 @@ IRODORI_OPT_TE_DEVICE=cpu IRODORI_OPT_VRAM_LIMIT_MB=2560 IRODORI_OPT_DECODE_CHUN
   stress 6/6・churn 18/18 通過（12 の 15 節）。
 - carve-out を使わない（`gttsize` 未指定の）場合は `IRODORI_OPT_VRAM_LIMIT_MB=3840 IRODORI_OPT_DECODE_CHUNK=192`
   で GTT 上でも動く（RTF 1.02〜1.12、通常 RAM を 3.3 GB 消費。12 の 10〜12 節）。
+
+#### Gradio を iGPU で動かす
+
+```bash
+cd ~/dev/Irodori-TTS
+HSA_OVERRIDE_GFX_VERSION=9.0.0 \
+IRODORI_OPT_COMPILE_DIT=0 IRODORI_OPT_CUDA_GRAPH=0 IRODORI_OPT_PREBAKE=0 \
+IRODORI_OPT_TE_DEVICE=cpu IRODORI_OPT_VRAM_LIMIT_MB=2560 IRODORI_OPT_DECODE_CHUNK=96 \
+  .venv-rocm/bin/python gradio_app.py        # http://127.0.0.1:7860
+```
+
+- `uv run` ではなく **`.venv-rocm/bin/python` を直接**使う（`uv run` は cu128 の `.venv` を使う）。
+- `IRODORI_OPT_COMPILE_DIT=0` は必須。`gradio_app.py` は常駐前提で DiT の compile を**既定 on** にしているが
+  （`gradio_app.py` 冒頭の `setdefault`）、gfx900 には Triton がなく compile できない。
+- 残りの環境変数は上の carve-out 構成と同じ。AdaLN バッチ化と Linear 融合は ROCm では自動で on。
+- UI の既定は dGPU 向けなので、リクエストごとに次を選ぶ:
+  - **Model Device / Codec Device**: `cuda`（ROCm の torch では iGPU が `cuda` として見える。dGPU は見えない）
+  - **Model Precision / Codec Precision**: **`fp16`**（既定は bf16。GFX9 の bf16 はエミュレーションで遅い）
+  - **Num Steps** 12、**Time Schedule** `sway`（既定の 40 / linear だと RTF 3 以上）
+  - 参照音声は **30 s 以内**のものを使う。Gradio には `--max-ref-seconds` 相当の設定がなく（`max_ref_seconds=None`）、
+    長い参照は上限 2560 MB に当たり得る（12 の 13.3 節の stress は参照 ≤ 30 s で通している）。
+- 初回リクエストは MIOpen の探索とロードで数十秒かかる。2 回目以降が本番の速度（short で 6.3 s 程度）。
+- `gradio_app_voicedesign.py` も同じ環境変数で起動できるはず（未確認）。
