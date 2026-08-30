@@ -142,7 +142,7 @@ HSA_OVERRIDE_GFX_VERSION=9.0.0 .venv-rocm/bin/python bench/probe_igpu.py
 `local_mem_size_public = ttm_tt_pages_limit()`（= GTT）を返し、VRAM を報告しない。
 GTT の既定は RAM の約半分（13 963 MiB）で、carve-out 4 096 MiB より大きいので必ず GTT 優先になる。
 
-**回避策（要再起動、未検証）**: カーネル引数で GTT を carve-out 未満に絞る。
+**回避策（要再起動。15 節で実証済み）**: カーネル引数で GTT を carve-out 未満に絞る。
 
 ```
 amdgpu.gttsize=4000      # 4000 < 4096 → apu_prefer_gtt = false → KFD が VRAM 4 GB を公開
@@ -289,7 +289,7 @@ amdgpu の `mem_info_gtt_used` を記録）:
 | iGPU への TTS オフロード（ROCm 6.3 + gfx900 偽装、fp16、MIOpen off、chunk 192、graph off、上限 3840） | **採用（動作点として成立）**。sway 12 で RTF **1.02〜1.12**、4 GB 以内 |
 | step 削減で RTF < 1 | 不採用（聴感） |
 | CFG バッチ 2（alternating / joint） | 保留。現状は legacy 経路で遅い。fast sampler 対応と聴感（`12_igpu_alt_*.wav`）が前提 |
-| carve-out (UMA) の利用 | 未達。`amdgpu.gttsize=4000` + 再起動で切り替え可能な見込み（7 節、未検証）。ユーザー判断で GTT 可 |
+| carve-out (UMA) の利用 | **採用**（15 節）。`amdgpu.gttsize=4000` で KFD のプールが VRAM 4 GiB に切り替わり、TE=cpu + 上限 2560 で bench / stress / churn すべて OOM なし。GTT 時より RTF 8〜10% 良い |
 | `IRODORI_OPT_CODEC_CUDNN`（auto: ROCm で MIOpen off） | 採用。dGPU の経路は不変 |
 | `bench_runtime.py` の `--device` / fp16 / sway / `--cfg-scale` / `--cudnn-benchmark`、`stress_vram.py` の fp16 / sway / ROCm 対応 | 採用 |
 
@@ -355,7 +355,7 @@ BIOS は非公式版で UMA を変更できないため、carve-out を使うな
 - torch の allocator の外に **約 370 MiB**（HIP ランタイム、rocBLAS / im2col の作業領域）が乗る。
   つまり上限 3072 でも実使用は 3.4 GB で、carve-out の空き 3.2 GB には**入らない**。
 - HIP には GTT への自動はみ出しがない（KFD は VRAM の確保上限で ENOMEM を返す）ので、溢れたら
-  即 OOM。allocator 上限は **2.6 GB 程度**が必要で、現状の peak alloc（代表入力 2.35 GB、宣言上限
+  即 OOM（と当時は考えたが、VRAM プールに切り替えた後は TTM の eviction で GTT に退避する。15.1 節）。allocator 上限は **2.6 GB 程度**が必要で、現状の peak alloc（代表入力 2.35 GB、宣言上限
   2.87 GB）より 0.3〜0.5 GB 削らないと成立しない。
 - 削り代（実験 13 のメモリ側）: ModernBERT text encoder（310M、fp16 0.6 GB）を CPU に置く
   （1 リクエスト 1 回、数十トークンなので CPU でも 100〜200 ms）、decode chunk 64 / encode chunk
@@ -423,7 +423,7 @@ text 256 + caption + 参照）を 6 周 = 36 リクエスト、上限 2560 + TE=
 
 ## 14. 再起動後の再開手順（新しいセッション向けの引き継ぎ）
 
-**状況（2026-08-30 時点）**: 実験 12 は GTT 上での動作点まで完了し、carve-out（UMA 4 GB）を使う
+**状況（2026-08-30 午前時点。同日午後に再起動して 15 節で完了）**: 実験 12 は GTT 上での動作点まで完了し、carve-out（UMA 4 GB）を使う
 ための準備（TE=cpu、上限 2560 で churn 通過）も済んでいる。残っているのは **カーネル引数
 `amdgpu.gttsize=4000` で再起動して、KFD のメモリプールが VRAM（carve-out）に切り替わるかの実測**
 だけ。コミット済み（`84568e5` まで、main）。未コミットの作業はない。
@@ -498,3 +498,98 @@ iGPU の独立 CFG 経路は `det=False` なので hash 比較は使えず、dGP
 - `HSA_OVERRIDE_GFX_VERSION=9.0.0` を忘れると ROCm が gfx90c を認識せず `cuda.is_available()` が False になる。
 - `/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory` の警告は無害。
 - MIOpen の find-db は `~/.config/miopen/`（初回のみ数分の探索が走る）。
+
+## 15. 再起動後の実測: carve-out (VRAM 4 GiB) 運用の成立
+
+`amdgpu.gttsize=4000` で再起動し（2026-08-30）、14 節の手順をそのまま実行した。
+
+### 15.1 プールの切り替わり
+
+| 確認項目 | 再起動前（GTT） | **再起動後** |
+|---|---|---|
+| `journalctl -k` | – | `4096M of VRAM memory ready` / `4000M of GTT memory ready`（`GTT size ... but TTM size has been set as 14641475584, this is unusual` の警告は出るが無害） |
+| KFD `mem_banks/0`（node 1） | heap_type 1, 13.6 GiB | heap_type 1, **4 GiB** |
+| `torch.cuda.mem_get_info()` total | 13 963 MiB | **4 096 MiB**（free 4 038。表示分は差し引かれない） |
+| `mem_info_gtt_total` | 13 963 MiB | 4 000 MiB |
+
+確保テスト（`torch.empty` を積む）:
+
+| 累積確保 | `mem_info_vram_used` | `mem_info_gtt_used` |
+|---|---|---|
+| 0（表示のみ） | 622 MiB | 84 MiB |
+| 2 GiB | **2 816** | 85 |
+| 3 GiB | 3 840 | 85 |
+| 3.7 GiB | 4 081 | **539** |
+| プロセス終了後 | **168** | 539 |
+
+- HIP の確保は VRAM（carve-out）に載る。GTT は動かない。
+- 4 GiB を超えると OOM ではなく **TTM が古いバッファを GTT に退避**する（表示用の 622 MiB が GTT に
+  移り、プロセス終了後もそのまま）。13.2 節の「溢れたら即 OOM」は GTT プール時の話で、VRAM プールでは
+  退避が効く。退避後は表示が GTT に住むので、carve-out 4 GiB がほぼ丸ごと TTS に使える。
+- プロセス終了直後の `mem_info_vram_used` は数秒〜十数秒遅れて下がる（KFD の解放が遅延）。
+
+### 15.2 本番相当の 3 本（TE=cpu、上限 2560、chunk 96、fp16、sway 12、graph off）
+
+**代表入力**（`results/12_igpu_vram_final.json`、repeats 2）:
+
+| 入力 | 音声長 | wall | **RTF** | sample_rf | decode_latent | peak alloc | VRAM 実使用 max | GTT 時（10 / 13.3 節） |
+|---|---|---|---|---|---|---|---|---|
+| short | 6.44 s | 6.80 s | **1.056** | 4.78 s | 1.86 s | 1 557 MiB | 2 691 MiB | 7.53 s / 1.17 |
+| medium | 10.88 s | 10.68 s | **0.982** | 7.31 s | 3.20 s | 1 620 MiB | 2 693 MiB | 11.80 s / 1.08 |
+| long | 28.76 s | 29.48 s | **1.025** | 20.53 s | 8.74 s | 1 743 MiB | 2 697 MiB | 30.84 s / 1.07 |
+| caption_noref | 7.32 s | 7.52 s | **1.027** | 5.22 s | 2.06 s | 1 557 MiB | 2 697 MiB | – / 1.13 |
+
+- **GTT 時より 8〜10% 速い**。差はすべて `sample_rf`（short 5.49 → 4.78 s、long 21.8 → 20.5 s）で、
+  decode は同じ。carve-out は物理連続でページ変換が軽い（GTT は 4 KiB ページの GPUVM 経由）ため、
+  DiT のような細かい GEMM の連打で TLB の効きが違うのだと解釈している（未プロファイル）。
+- medium は RTF **0.98** で初めて 1 を切った。peak alloc は GTT 時と同じ（1.56〜1.74 GB）。
+
+**宣言上限入力の stress**（`results/12_igpu_vram_stress.json`、6/6 ok）:
+
+| ケース | peak alloc | reserved | VRAM+GTT 実使用（GTT ≈ 533 は表示分） |
+|---|---|---|---|
+| text_max | 1 704 MiB | 2 394 MiB | 3 016 MiB |
+| caption_max | 2 260 | 2 388 | 3 410 |
+| caption_max_noref | 1 959 | 2 388 | 3 410 |
+| ref15 / ref30 | 1 739 / 1 806 | 2 406 | 3 424 / 3 428 |
+| **worst** | **2 390** | **2 456** | **3 489**（VRAM ≈ 2 956 MiB） |
+
+- worst の VRAM 分 ≈ 2 956 MiB は GTT 時の HIP 実使用 2 952 MiB と一致。プールが変わっても
+  allocator 外のオーバーヘッド（≈ 400〜500 MiB）は同じ。
+- `bench/stress_vram.py` の ROCm 経路は `mem_info_gtt_used` のみだったので、`vram_used + gtt_used` の
+  和を記録するよう変更した（プールがどちらでも「iGPU が保持する総量」になる）。
+
+**長時間 churn**（`results/12_igpu_churn_vram.json`、6 種 × 3 周 = 18 リクエスト、6.3 min）:
+
+| 指標 | 値 |
+|---|---|
+| OOM | **0 / 18** |
+| peak alloc（最大） | 1 753 MiB |
+| reserved | 6 リクエスト目で 2 432 MiB に達した後横ばい |
+| sysfs ベースライン → 実行中ピーク | VRAM 170 → **2 929 MiB**、GTT 533 → 534 MiB |
+
+- TTS 分 ≈ 2.76 GB がすべて VRAM から取られ、GTT は 1 MiB しか動かない。**carve-out を使えている**。
+- 余白: 表示が GTT に退避した状態では 4 096 − 2 929 ≈ 1.1 GB。表示（622 MiB）が VRAM に戻っても
+  ≈ 550 MiB 残る。14.2 節で「VRAM が 3 700 前後まで上がる」と予想したのは表示分が VRAM に居続ける
+  前提で、実際は退避されるためそれより低い。
+
+### 15.3 採否と推奨構成
+
+**carve-out 運用を採用**。dGPU の 16 GB は VLM に丸ごと渡し、TTS は iGPU の UMA 4 GiB（通常 RAM から
+BIOS が既に切り出している分）で動く。通常 RAM の追加消費は ModernBERT (CPU fp32) の約 1.2 GB と
+プロセス自体のみ。
+
+| 項目 | 値 |
+|---|---|
+| カーネル引数 | `amdgpu.gttsize=4000`（`/etc/default/grub`、`update-grub` 済み） |
+| 環境変数 | `HSA_OVERRIDE_GFX_VERSION=9.0.0 IRODORI_OPT_CUDA_GRAPH=0 IRODORI_OPT_PREBAKE=0 IRODORI_OPT_TE_DEVICE=cpu IRODORI_OPT_VRAM_LIMIT_MB=2560 IRODORI_OPT_DECODE_CHUNK=96` |
+| infer.py | `--model-device cuda --codec-device cuda --precision fp16 --codec-precision fp16 --num-steps 12 --t-schedule-mode sway --max-ref-seconds 30` |
+| RTF（sway 12） | short 1.06 / medium 0.98 / long 1.03 / caption 1.03 |
+| メモリ | VRAM 実使用 2.7 GB（代表入力）〜 3.0 GB（worst）、余白 ≥ 0.5 GB |
+
+副作用は GTT（iGPU のシステムメモリ側バッファ）がデスクトップ全体で 4 GB に制限されることだけで、
+表示は iGPU で通常どおり動いている（表示バッファが GTT に退避しても問題は出ていない）。
+戻すときは 14.3 節。
+
+残件は速度側（実験 13、13.1 節の優先順位）。動作点は VRAM プールに変わったので、実験 13 の iGPU 計測は
+本節の構成（`12_igpu_vram_final.json`）を基準にする。

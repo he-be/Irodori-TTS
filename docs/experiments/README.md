@@ -127,11 +127,13 @@ VLM 側は `NCMOE=11 ./bench/coexist_llama_swap.sh` で静的に 12.0 GB に固�
 ### iGPU (Radeon Vega 7 / ROCm) で動かすとき（12 参照）
 
 dGPU を VLM に明け渡し、TTS を CPU 内蔵の Vega 7 で回す構成。`.venv-rocm`（torch 2.9.1+rocm6.3 —
-gfx900 のカーネルを同梱する最後の wheel）を使い、gfx90c を gfx900 に偽装する。
+gfx900 のカーネルを同梱する最後の wheel）を使い、gfx90c を gfx900 に偽装する。メモリは BIOS の UMA
+carve-out (4 GiB) から取る。そのためにカーネル引数 `amdgpu.gttsize=4000` が必要（12 の 7 / 15 節。
+これがないと KFD は通常 RAM (GTT) をプールにし、carve-out は遊ぶ）。
 
 ```bash
-HSA_OVERRIDE_GFX_VERSION=9.0.0 IRODORI_OPT_CUDA_GRAPH=0 IRODORI_OPT_VRAM_LIMIT_MB=3840 \
-IRODORI_OPT_DECODE_CHUNK=192 \
+HSA_OVERRIDE_GFX_VERSION=9.0.0 IRODORI_OPT_CUDA_GRAPH=0 IRODORI_OPT_PREBAKE=0 \
+IRODORI_OPT_TE_DEVICE=cpu IRODORI_OPT_VRAM_LIMIT_MB=2560 IRODORI_OPT_DECODE_CHUNK=96 \
   .venv-rocm/bin/python infer.py --hf-checkpoint Aratako/Irodori-TTS-v4.1-Small \
   --model-device cuda --codec-device cuda --precision fp16 --codec-precision fp16 \
   --num-steps 12 --t-schedule-mode sway --max-ref-seconds 30 --text ... --ref-wav ...
@@ -139,8 +141,8 @@ IRODORI_OPT_DECODE_CHUNK=192 \
 
 - 精度は **fp16**（GFX9 に bf16 演算器がない）。codec の conv は自動で MIOpen を迂回する
   （`IRODORI_OPT_CODEC_CUDNN=auto`、dilated conv1d の素朴カーネル回避）。
-- sway 12 step で RTF ≈ 1.0〜1.1、reserved ≈ 3.6 GB。RTF < 1 が要るなら step 10（聴感で判断）。
-- メモリは carve-out ではなく GTT（通常 RAM）から取られる。carve-out（空き ≈ 3.2 GB）を使わせるには
-  カーネル引数 `amdgpu.gttsize=4000` で再起動し（pool の切り替わりは未検証、12 の 7 節）、TTS 側を
-  `IRODORI_OPT_TE_DEVICE=cpu IRODORI_OPT_VRAM_LIMIT_MB=2560 IRODORI_OPT_DECODE_CHUNK=96` に絞る
-  （HIP 実使用 ≈ 2.95 GB、参照 30 s 上限の stress を全通過。12 の 13.3 節）。
+- ModernBERT (text/caption encoder) は CPU に置く（`IRODORI_OPT_TE_DEVICE=cpu`、+10〜80 ms）。
+- sway 12 step で RTF **0.98〜1.06**（carve-out は GTT より 8〜10% 速い）。VRAM 実使用は代表入力で
+  2.7 GB、参照 30 s 上限の worst で 3.0 GB。stress 6/6・churn 18/18 通過（12 の 15 節）。
+- carve-out を使わない（`gttsize` 未指定の）場合は `IRODORI_OPT_VRAM_LIMIT_MB=3840 IRODORI_OPT_DECODE_CHUNK=192`
+  で GTT 上でも動く（RTF 1.02〜1.12、通常 RAM を 3.3 GB 消費。12 の 10〜12 節）。

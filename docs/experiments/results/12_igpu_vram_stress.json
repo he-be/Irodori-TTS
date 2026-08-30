@@ -1,0 +1,88 @@
+{
+  "tag": "12_igpu_vram_stress",
+  "timestamp": "2026-08-30T11:03:30",
+  "git_commit": "a29f2fc",
+  "env": {
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "torch": "2.9.1+rocm6.3",
+    "gpu": "AMD Radeon Graphics",
+    "env_overrides": [],
+    "alloc_conf": "expandable_segments:True"
+  },
+  "config": {
+    "precision": "fp16",
+    "codec_precision": "fp16",
+    "repeats": 1,
+    "graph_fill": 0,
+    "opt": "reuse_conditions=True crop_text=True fast_sampler=True cuda_graph=False graph_bucket=32 graph_max_entries=6 graph_max_static_mb=256 graph_shared_pool=False graph_max_latent_frames=384 graph_release_pool_on_evict=True graph_capture_after=1 codec_fold_weight_norm=True reference_cache=True reference_cache_entries=8 cpu_cast=True watermark=False text_bucket=16 speaker_bucket=64 compile_dit=False compile_codec=False decode_chunk_frames=96 decode_overlap_frames=16 decode_autocast_bf16=True codec_cudnn=auto text_encoder_device=cpu encode_chunk_frames=96 encode_overlap_frames=32 vram_limit_mb=2560 empty_cache_after_request=False skip_init=True prebake=False load_parallel=True"
+  },
+  "load_sec": 5.294374799000025,
+  "cuda_mem_after_load": {
+    "allocated": 1145425920,
+    "reserved": 1654652928
+  },
+  "graph_after_fill": null,
+  "fill_errors": [],
+  "results": {
+    "text_max": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 35.874032795999995,
+      "wall_last": 35.874032795999995,
+      "max_allocated": 1786748416,
+      "max_reserved": 2510290944,
+      "private_pool": 0,
+      "smi_used_after": 3016
+    },
+    "caption_max": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 44.464583110000035,
+      "wall_last": 44.464583110000035,
+      "max_allocated": 2369292800,
+      "max_reserved": 2503999488,
+      "private_pool": 0,
+      "smi_used_after": 3410
+    },
+    "caption_max_noref": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 37.52281930700002,
+      "wall_last": 37.52281930700002,
+      "max_allocated": 2053933568,
+      "max_reserved": 2503999488,
+      "private_pool": 0,
+      "smi_used_after": 3410
+    },
+    "ref15": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 37.62000256800002,
+      "wall_last": 37.62000256800002,
+      "max_allocated": 1822999040,
+      "max_reserved": 2522873856,
+      "private_pool": 0,
+      "smi_used_after": 3424
+    },
+    "ref30": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 41.56473823500005,
+      "wall_last": 41.56473823500005,
+      "max_allocated": 1893901824,
+      "max_reserved": 2522873856,
+      "private_pool": 0,
+      "smi_used_after": 3428
+    },
+    "worst": {
+      "ok": true,
+      "audio_seconds": 30.0,
+      "wall_first": 46.23200222599996,
+      "wall_last": 46.23200222599996,
+      "max_allocated": 2506377728,
+      "max_reserved": 2575302656,
+      "private_pool": 0,
+      "smi_used_after": 3489
+    }
+  }
+}

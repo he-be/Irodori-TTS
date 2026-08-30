@@ -78,11 +78,13 @@ def _private_pool_bytes() -> int:
 
 def _smi_used() -> int:
     if getattr(torch.version, "hip", None):
-        # ROCm iGPU: nvidia-smi would report the other card; read amdgpu GTT usage (docs/experiments/12).
+        # ROCm iGPU: nvidia-smi would report the other card; read amdgpu VRAM + GTT usage
+        # (the HIP pool is GTT by default, VRAM with amdgpu.gttsize < carve-out; docs/experiments/12).
         for card in sorted(Path("/sys/class/drm").glob("card[0-9]")):
             try:
                 if (card / "device" / "driver").resolve().name == "amdgpu":
-                    return int((card / "device" / "mem_info_gtt_used").read_text()) // 2**20
+                    dev = card / "device"
+                    return sum(int((dev / f).read_text()) for f in ("mem_info_vram_used", "mem_info_gtt_used")) // 2**20
             except OSError:
                 continue
         return -1
