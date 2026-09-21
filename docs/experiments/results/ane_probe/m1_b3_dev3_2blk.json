@@ -1,0 +1,145 @@
+{
+ "tag": "m1_b3_dev3_2blk",
+ "host": {
+  "chip": "Apple M1",
+  "macos": "27.0",
+  "coremltools": "9.0"
+ },
+ "package": {
+  "batch": 3,
+  "profile": "a",
+  "latents": [
+   192,
+   320,
+   768
+  ],
+  "ctx_pad_start": 0,
+  "blocks": 2,
+  "units": "ne",
+  "score_mib_max": 80.7,
+  "score_mib_sum": 105.2
+ },
+ "pre": {
+  "loadavg": [
+   2.09,
+   1.96,
+   1.74
+  ],
+  "swap": "total = 2048.00M  used = 1257.81M  free = 790.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 17366,
+    "pcpu": 0.0,
+    "etime": "07:42"
+   }
+  ],
+  "killed_stale": {
+   "before": [
+    {
+     "pid": 17366,
+     "pcpu": 0.0,
+     "etime": "07:42"
+    }
+   ],
+   "pkill_rc": 0,
+   "pkill_err": "",
+   "after_2s": [],
+   "after_5s": []
+  }
+ },
+ "convert_s": 58.4,
+ "convert_peak_rss_mib": 1881,
+ "compile_model_s": 0.1,
+ "disk_mib": 128,
+ "load": {
+  "status": "ok",
+  "wall_s": 53.2,
+  "load_s": 49.22,
+  "steps": [
+   {
+    "x_t": [
+     3,
+     192,
+     32
+    ],
+    "first_ms": 58.5,
+    "median_ms": 20.07
+   },
+   {
+    "x_t": [
+     3,
+     320,
+     32
+    ],
+    "first_ms": 74.1,
+    "median_ms": 37.12
+   },
+   {
+    "x_t": [
+     3,
+     768,
+     32
+    ],
+    "first_ms": 144.5,
+    "median_ms": 106.71
+   }
+  ]
+ },
+ "reload": {
+  "status": "ok",
+  "wall_s": 4.0,
+  "load_s": 0.05,
+  "steps": [
+   {
+    "x_t": [
+     3,
+     192,
+     32
+    ],
+    "first_ms": 58.4,
+    "median_ms": 19.63
+   },
+   {
+    "x_t": [
+     3,
+     320,
+     32
+    ],
+    "first_ms": 70.1,
+    "median_ms": 36.71
+   },
+   {
+    "x_t": [
+     3,
+     768,
+     32
+    ],
+    "first_ms": 139.6,
+    "median_ms": 106.49
+   }
+  ]
+ },
+ "log": {
+  "compilation_failed": 0,
+  "model_load_failed": 0,
+  "spiller_failure": 0,
+  "regalloc_l2_miss": 0,
+  "lines": 36
+ },
+ "verdict": "ane_ok",
+ "post": {
+  "loadavg": [
+   2.19,
+   1.97,
+   1.77
+  ],
+  "swap": "total = 2048.00M  used = 1257.81M  free = 790.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 17429,
+    "pcpu": 0.0,
+    "etime": "01:51"
+   }
+  ]
+ }
+}

@@ -1,0 +1,145 @@
+{
+ "tag": "m1_b3_dev3_pad14_2blk",
+ "host": {
+  "chip": "Apple M1",
+  "macos": "27.0",
+  "coremltools": "9.0"
+ },
+ "package": {
+  "batch": 3,
+  "profile": "a",
+  "latents": [
+   192,
+   320,
+   768
+  ],
+  "ctx_pad_start": 14,
+  "blocks": 2,
+  "units": "ne",
+  "score_mib_max": 84.4,
+  "score_mib_sum": 111.3
+ },
+ "pre": {
+  "loadavg": [
+   1.53,
+   1.75,
+   1.71
+  ],
+  "swap": "total = 2048.00M  used = 1257.81M  free = 790.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 17488,
+    "pcpu": 0.0,
+    "etime": "02:30"
+   }
+  ],
+  "killed_stale": {
+   "before": [
+    {
+     "pid": 17488,
+     "pcpu": 0.0,
+     "etime": "02:30"
+    }
+   ],
+   "pkill_rc": 0,
+   "pkill_err": "",
+   "after_2s": [],
+   "after_5s": []
+  }
+ },
+ "convert_s": 58.5,
+ "convert_peak_rss_mib": 1878,
+ "compile_model_s": 0.1,
+ "disk_mib": 128,
+ "load": {
+  "status": "ok",
+  "wall_s": 55.1,
+  "load_s": 51.1,
+  "steps": [
+   {
+    "x_t": [
+     3,
+     192,
+     32
+    ],
+    "first_ms": 56.3,
+    "median_ms": 20.4
+   },
+   {
+    "x_t": [
+     3,
+     320,
+     32
+    ],
+    "first_ms": 71.7,
+    "median_ms": 37.6
+   },
+   {
+    "x_t": [
+     3,
+     768,
+     32
+    ],
+    "first_ms": 143.8,
+    "median_ms": 107.35
+   }
+  ]
+ },
+ "reload": {
+  "status": "ok",
+  "wall_s": 4.0,
+  "load_s": 0.05,
+  "steps": [
+   {
+    "x_t": [
+     3,
+     192,
+     32
+    ],
+    "first_ms": 57.1,
+    "median_ms": 20.4
+   },
+   {
+    "x_t": [
+     3,
+     320,
+     32
+    ],
+    "first_ms": 74.7,
+    "median_ms": 37.44
+   },
+   {
+    "x_t": [
+     3,
+     768,
+     32
+    ],
+    "first_ms": 145.2,
+    "median_ms": 107.78
+   }
+  ]
+ },
+ "log": {
+  "compilation_failed": 0,
+  "model_load_failed": 0,
+  "spiller_failure": 0,
+  "regalloc_l2_miss": 0,
+  "lines": 36
+ },
+ "verdict": "ane_ok",
+ "post": {
+  "loadavg": [
+   1.75,
+   1.74,
+   1.71
+  ],
+  "swap": "total = 2048.00M  used = 1241.81M  free = 806.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 17522,
+    "pcpu": 0.0,
+    "etime": "01:54"
+   }
+  ]
+ }
+}

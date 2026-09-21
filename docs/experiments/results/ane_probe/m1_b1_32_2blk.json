@@ -1,0 +1,107 @@
+{
+ "tag": "m1_b1_32_2blk",
+ "host": {
+  "chip": "Apple M1",
+  "macos": "27.0",
+  "coremltools": "9.0"
+ },
+ "package": {
+  "batch": 1,
+  "profile": "a",
+  "latents": [
+   32
+  ],
+  "ctx_pad_start": 0,
+  "blocks": 2,
+  "units": "ne",
+  "score_mib_max": 0.2,
+  "score_mib_sum": 0.2
+ },
+ "pre": {
+  "loadavg": [
+   1.54,
+   1.59,
+   1.63
+  ],
+  "swap": "total = 2048.00M  used = 1241.81M  free = 806.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 17768,
+    "pcpu": 0.0,
+    "etime": "00:20"
+   }
+  ],
+  "killed_stale": {
+   "before": [
+    {
+     "pid": 17768,
+     "pcpu": 0.0,
+     "etime": "00:20"
+    }
+   ],
+   "pkill_rc": 0,
+   "pkill_err": "",
+   "after_2s": [],
+   "after_5s": []
+  }
+ },
+ "convert_s": 6.2,
+ "convert_peak_rss_mib": 1867,
+ "compile_model_s": 0.1,
+ "disk_mib": 128,
+ "load": {
+  "status": "ok",
+  "wall_s": 5.1,
+  "load_s": 2.14,
+  "steps": [
+   {
+    "x_t": [
+     1,
+     32,
+     32
+    ],
+    "first_ms": 17.5,
+    "median_ms": 2.91
+   }
+  ]
+ },
+ "reload": {
+  "status": "ok",
+  "wall_s": 3.0,
+  "load_s": 0.04,
+  "steps": [
+   {
+    "x_t": [
+     1,
+     32,
+     32
+    ],
+    "first_ms": 10.2,
+    "median_ms": 2.91
+   }
+  ]
+ },
+ "log": {
+  "compilation_failed": 0,
+  "model_load_failed": 0,
+  "spiller_failure": 0,
+  "regalloc_l2_miss": 0,
+  "lines": 78
+ },
+ "verdict": "ane_ok",
+ "post": {
+  "loadavg": [
+   1.53,
+   1.59,
+   1.63
+  ],
+  "swap": "total = 2048.00M  used = 1241.81M  free = 806.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 17792,
+    "pcpu": 0.0,
+    "etime": "00:08"
+   }
+  ]
+ }
+}

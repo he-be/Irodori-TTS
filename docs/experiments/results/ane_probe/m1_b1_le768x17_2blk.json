@@ -1,0 +1,411 @@
+{
+ "tag": "m1_b1_le768x17_2blk",
+ "host": {
+  "chip": "Apple M1",
+  "macos": "27.0",
+  "coremltools": "9.0"
+ },
+ "package": {
+  "batch": 1,
+  "profile": "a",
+  "latents": [
+   32,
+   64,
+   96,
+   128,
+   160,
+   192,
+   224,
+   256,
+   288,
+   320,
+   384,
+   448,
+   512,
+   576,
+   640,
+   704,
+   768
+  ],
+  "ctx_pad_start": 0,
+  "blocks": 2,
+  "units": "ne",
+  "score_mib_max": 28.1,
+  "score_mib_sum": 147.2
+ },
+ "pre": {
+  "loadavg": [
+   1.64,
+   1.86,
+   1.74
+  ],
+  "swap": "total = 2048.00M  used = 1257.81M  free = 790.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 17459,
+    "pcpu": 0.0,
+    "etime": "00:38"
+   }
+  ],
+  "killed_stale": {
+   "before": [
+    {
+     "pid": 17459,
+     "pcpu": 0.0,
+     "etime": "00:38"
+    }
+   ],
+   "pkill_rc": 0,
+   "pkill_err": "",
+   "after_2s": [],
+   "after_5s": []
+  }
+ },
+ "convert_s": 11.1,
+ "convert_peak_rss_mib": 1879,
+ "compile_model_s": 0.1,
+ "disk_mib": 128,
+ "load": {
+  "status": "ok",
+  "wall_s": 75.2,
+  "load_s": 60.73,
+  "steps": [
+   {
+    "x_t": [
+     1,
+     32,
+     32
+    ],
+    "first_ms": 62.1,
+    "median_ms": 21.78
+   },
+   {
+    "x_t": [
+     1,
+     64,
+     32
+    ],
+    "first_ms": 36.5,
+    "median_ms": 29.48
+   },
+   {
+    "x_t": [
+     1,
+     96,
+     32
+    ],
+    "first_ms": 45.2,
+    "median_ms": 37.23
+   },
+   {
+    "x_t": [
+     1,
+     128,
+     32
+    ],
+    "first_ms": 52.1,
+    "median_ms": 45.01
+   },
+   {
+    "x_t": [
+     1,
+     160,
+     32
+    ],
+    "first_ms": 60.1,
+    "median_ms": 52.66
+   },
+   {
+    "x_t": [
+     1,
+     192,
+     32
+    ],
+    "first_ms": 68.7,
+    "median_ms": 61.21
+   },
+   {
+    "x_t": [
+     1,
+     224,
+     32
+    ],
+    "first_ms": 78.6,
+    "median_ms": 69.86
+   },
+   {
+    "x_t": [
+     1,
+     256,
+     32
+    ],
+    "first_ms": 88.1,
+    "median_ms": 79.03
+   },
+   {
+    "x_t": [
+     1,
+     288,
+     32
+    ],
+    "first_ms": 97.8,
+    "median_ms": 87.65
+   },
+   {
+    "x_t": [
+     1,
+     320,
+     32
+    ],
+    "first_ms": 105.1,
+    "median_ms": 96.87
+   },
+   {
+    "x_t": [
+     1,
+     384,
+     32
+    ],
+    "first_ms": 126.6,
+    "median_ms": 116.97
+   },
+   {
+    "x_t": [
+     1,
+     448,
+     32
+    ],
+    "first_ms": 146.4,
+    "median_ms": 136.6
+   },
+   {
+    "x_t": [
+     1,
+     512,
+     32
+    ],
+    "first_ms": 172.4,
+    "median_ms": 159.24
+   },
+   {
+    "x_t": [
+     1,
+     576,
+     32
+    ],
+    "first_ms": 217.8,
+    "median_ms": 183.89
+   },
+   {
+    "x_t": [
+     1,
+     640,
+     32
+    ],
+    "first_ms": 236.0,
+    "median_ms": 205.85
+   },
+   {
+    "x_t": [
+     1,
+     704,
+     32
+    ],
+    "first_ms": 268.4,
+    "median_ms": 233.14
+   },
+   {
+    "x_t": [
+     1,
+     768,
+     32
+    ],
+    "first_ms": 298.0,
+    "median_ms": 264.28
+   }
+  ]
+ },
+ "reload": {
+  "status": "ok",
+  "wall_s": 74.9,
+  "load_s": 60.38,
+  "steps": [
+   {
+    "x_t": [
+     1,
+     32,
+     32
+    ],
+    "first_ms": 62.3,
+    "median_ms": 21.86
+   },
+   {
+    "x_t": [
+     1,
+     64,
+     32
+    ],
+    "first_ms": 36.6,
+    "median_ms": 29.46
+   },
+   {
+    "x_t": [
+     1,
+     96,
+     32
+    ],
+    "first_ms": 45.0,
+    "median_ms": 37.24
+   },
+   {
+    "x_t": [
+     1,
+     128,
+     32
+    ],
+    "first_ms": 51.8,
+    "median_ms": 45.39
+   },
+   {
+    "x_t": [
+     1,
+     160,
+     32
+    ],
+    "first_ms": 64.3,
+    "median_ms": 53.38
+   },
+   {
+    "x_t": [
+     1,
+     192,
+     32
+    ],
+    "first_ms": 69.1,
+    "median_ms": 61.09
+   },
+   {
+    "x_t": [
+     1,
+     224,
+     32
+    ],
+    "first_ms": 78.1,
+    "median_ms": 69.93
+   },
+   {
+    "x_t": [
+     1,
+     256,
+     32
+    ],
+    "first_ms": 88.1,
+    "median_ms": 78.92
+   },
+   {
+    "x_t": [
+     1,
+     288,
+     32
+    ],
+    "first_ms": 97.3,
+    "median_ms": 87.57
+   },
+   {
+    "x_t": [
+     1,
+     320,
+     32
+    ],
+    "first_ms": 105.0,
+    "median_ms": 97.12
+   },
+   {
+    "x_t": [
+     1,
+     384,
+     32
+    ],
+    "first_ms": 125.8,
+    "median_ms": 117.07
+   },
+   {
+    "x_t": [
+     1,
+     448,
+     32
+    ],
+    "first_ms": 147.7,
+    "median_ms": 137.24
+   },
+   {
+    "x_t": [
+     1,
+     512,
+     32
+    ],
+    "first_ms": 171.1,
+    "median_ms": 157.88
+   },
+   {
+    "x_t": [
+     1,
+     576,
+     32
+    ],
+    "first_ms": 203.3,
+    "median_ms": 184.63
+   },
+   {
+    "x_t": [
+     1,
+     640,
+     32
+    ],
+    "first_ms": 226.7,
+    "median_ms": 206.77
+   },
+   {
+    "x_t": [
+     1,
+     704,
+     32
+    ],
+    "first_ms": 259.7,
+    "median_ms": 237.38
+   },
+   {
+    "x_t": [
+     1,
+     768,
+     32
+    ],
+    "first_ms": 299.5,
+    "median_ms": 264.83
+   }
+  ]
+ },
+ "log": {
+  "compilation_failed": 2,
+  "model_load_failed": 2,
+  "spiller_failure": 2,
+  "regalloc_l2_miss": 6,
+  "lines": 289
+ },
+ "verdict": "compile_failed",
+ "post": {
+  "loadavg": [
+   1.53,
+   1.75,
+   1.71
+  ],
+  "swap": "total = 2048.00M  used = 1257.81M  free = 790.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 17488,
+    "pcpu": 0.0,
+    "etime": "02:27"
+   }
+  ]
+ }
+}

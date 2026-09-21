@@ -381,10 +381,17 @@ def _cpu_wrapper(model: TextToLatentRFDiT) -> AneStepModule:
 
 
 def export_package(
-    model: TextToLatentRFDiT, shapes: list[Shape], mlpackage: Path, log: bool = True
+    model: TextToLatentRFDiT,
+    shapes: list[Shape],
+    mlpackage: Path,
+    log: bool = True,
+    default_index: int = 0,
+    skip_model_load: bool = False,
 ) -> None:
     """torch.export the step (batch fixed, latent/context lengths symbolic) on a CPU fp32 copy and
-    convert it with one enumerated shape per latent bucket."""
+    convert it with one enumerated shape per latent bucket. ``default_index`` picks the default
+    enumerated shape; ``skip_model_load`` stops ``ct.convert`` from loading (= ANE-compiling) the
+    result. Both are probe knobs (bench/probe_ane_shapes.py)."""
     import coremltools as ct
 
     dims = Dims.from_model(model)
@@ -425,7 +432,8 @@ def export_package(
     inputs = []
     for name in INPUT_NAMES:
         lst = per_input[name]
-        shape = lst[0] if len(lst) == 1 else ct.EnumeratedShapes(shapes=lst, default=lst[0])
+        default = lst[default_index]
+        shape = lst[0] if len(lst) == 1 else ct.EnumeratedShapes(shapes=lst, default=default)
         inputs.append(ct.TensorType(name=name, shape=shape, dtype=np.float16))
     t0 = time.perf_counter()
     mlmodel = ct.convert(
@@ -435,6 +443,7 @@ def export_package(
         compute_precision=ct.precision.FLOAT16,
         minimum_deployment_target=ct.target.macOS15,
         convert_to="mlprogram",
+        skip_model_load=skip_model_load,
     )
     if mlpackage.exists():
         shutil.rmtree(mlpackage)

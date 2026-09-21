@@ -1,0 +1,132 @@
+{
+ "tag": "smoke_m3_b1_1blk",
+ "host": {
+  "chip": "Apple M3 Pro",
+  "macos": "15.7.5",
+  "coremltools": "9.0"
+ },
+ "package": {
+  "batch": 1,
+  "profile": "a",
+  "latents": [
+   192,
+   320
+  ],
+  "ctx_pad_start": 0,
+  "blocks": 1,
+  "units": "ne",
+  "score_mib_max": 5.7,
+  "score_mib_sum": 8.2
+ },
+ "pre": {
+  "loadavg": [
+   3.09,
+   2.81,
+   2.73
+  ],
+  "swap": "total = 1024.00M  used = 214.00M  free = 810.00M  (encrypted)",
+  "compiler": []
+ },
+ "convert_s": 4.4,
+ "convert_peak_rss_mib": 3526,
+ "compile_model_s": 0.1,
+ "disk_mib": 71,
+ "load": {
+  "status": "ok",
+  "wall_s": 5.3,
+  "load_s": 1.98,
+  "steps": [
+   {
+    "x_t": [
+     1,
+     192,
+     32
+    ],
+    "first_ms": 4.5,
+    "median_ms": 3.3
+   },
+   {
+    "x_t": [
+     1,
+     320,
+     32
+    ],
+    "first_ms": 11.9,
+    "median_ms": 5.45
+   }
+  ]
+ },
+ "reload": {
+  "status": "ok",
+  "wall_s": 2.4,
+  "load_s": 0.03,
+  "steps": [
+   {
+    "x_t": [
+     1,
+     192,
+     32
+    ],
+    "first_ms": 4.7,
+    "median_ms": 3.18
+   },
+   {
+    "x_t": [
+     1,
+     320,
+     32
+    ],
+    "first_ms": 11.3,
+    "median_ms": 5.05
+   }
+  ]
+ },
+ "cpu_ref": {
+  "status": "ok",
+  "wall_s": 2.5,
+  "load_s": 0.13,
+  "steps": [
+   {
+    "x_t": [
+     1,
+     192,
+     32
+    ],
+    "first_ms": 17.4,
+    "median_ms": 12.32
+   },
+   {
+    "x_t": [
+     1,
+     320,
+     32
+    ],
+    "first_ms": 23.8,
+    "median_ms": 18.9
+   }
+  ]
+ },
+ "log": {
+  "compilation_failed": 0,
+  "model_load_failed": 0,
+  "spiller_failure": 0,
+  "regalloc_l2_miss": 0,
+  "lines": 45
+ },
+ "verdict": "ane_ok",
+ "post": {
+  "loadavg": [
+   3.51,
+   3.45,
+   3.08
+  ],
+  "swap": "total = 1024.00M  used = 214.00M  free = 810.00M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 33870,
+    "pcpu": 0.0,
+    "etime": "00:11"
+   }
+  ]
+ }
+}
