@@ -1,0 +1,94 @@
+{
+  "tag": "m1_longform_mps_eager",
+  "segments": 12,
+  "load_sec": 3.820454624999911,
+  "audio_seconds_total": 107.07999999999998,
+  "wall_seconds_total": 73.82753170799879,
+  "rtf_total": 0.6894614466566941,
+  "time_to_first_audio_s": 2.934196999998676,
+  "per_segment_ms_median": 6247.06495800001,
+  "rows": [
+    {
+      "i": 0,
+      "chars": 18,
+      "wall_ms": 2934.1940829999658,
+      "audio_s": 4.08
+    },
+    {
+      "i": 1,
+      "chars": 46,
+      "wall_ms": 6745.674084000711,
+      "audio_s": 9.56
+    },
+    {
+      "i": 2,
+      "chars": 48,
+      "wall_ms": 7466.857542000071,
+      "audio_s": 11.0
+    },
+    {
+      "i": 3,
+      "chars": 56,
+      "wall_ms": 8258.591083998908,
+      "audio_s": 12.48
+    },
+    {
+      "i": 4,
+      "chars": 50,
+      "wall_ms": 7604.532249999465,
+      "audio_s": 11.72
+    },
+    {
+      "i": 5,
+      "chars": 36,
+      "wall_ms": 6107.083541000975,
+      "audio_s": 8.4
+    },
+    {
+      "i": 6,
+      "chars": 36,
+      "wall_ms": 5898.130624998885,
+      "audio_s": 8.68
+    },
+    {
+      "i": 7,
+      "chars": 29,
+      "wall_ms": 4982.003708000775,
+      "audio_s": 5.68
+    },
+    {
+      "i": 8,
+      "chars": 43,
+      "wall_ms": 5279.696084000534,
+      "audio_s": 7.52
+    },
+    {
+      "i": 9,
+      "chars": 39,
+      "wall_ms": 6387.046374999045,
+      "audio_s": 9.72
+    },
+    {
+      "i": 10,
+      "chars": 52,
+      "wall_ms": 6839.416916998744,
+      "audio_s": 10.28
+    },
+    {
+      "i": 11,
+      "chars": 38,
+      "wall_ms": 5323.182542000723,
+      "audio_s": 7.96
+    }
+  ],
+  "config": {
+    "hf_checkpoint": "Aratako/Irodori-TTS-v4.1-Small",
+    "ref": "/Users/mh/dev/Irodori-TTS/outputs/sample.wav",
+    "num_steps": 12,
+    "t_schedule_mode": "sway",
+    "sway_coeff": -1.0,
+    "seed": 1234,
+    "tag": "m1_longform_mps_eager",
+    "output": "docs/experiments/results/m1_longform_mps_eager.json"
+  }
+}

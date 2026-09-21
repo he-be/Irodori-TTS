@@ -1,0 +1,81 @@
+{
+  "tag": "m1_conc_mps_b",
+  "timestamp": "2026-09-21T19:21:56",
+  "git_commit": "d94edd8",
+  "env": {
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "python": "3.12.14",
+    "torch": "2.10.0",
+    "device": "mps",
+    "machine": "arm64",
+    "macos": "27.0",
+    "mps_recommended_max_memory": 12713115648,
+    "env_overrides": [
+      "IRODORI_OPT_COMPILE_DIT=1",
+      "IRODORI_OPT_COMPILE_CODEC=1"
+    ]
+  },
+  "config": {
+    "checkpoint": "/Users/mh/.cache/huggingface/hub/models--Aratako--Irodori-TTS-v4.1-Small/snapshots/2b28324dc263ed5e6638b3cf3dd94c82ead07b4b/model.safetensors",
+    "precision": "fp16",
+    "codec_precision": "fp32",
+    "compile": false,
+    "compile_dynamic": false,
+    "num_steps": 12,
+    "t_schedule_mode": "sway",
+    "sway_coeff": -1.0,
+    "cfg_guidance_mode": "independent",
+    "seed": 1234,
+    "warmup": 1,
+    "repeats": 5,
+    "ref": "/Users/mh/dev/Irodori-TTS/outputs/sample.wav"
+  },
+  "load_sec": 5.121730875000139,
+  "warmup_sec_total": 29.490749041999152,
+  "mps_mem_after_load": {
+    "allocated": 1963619072,
+    "driver": 2731573248
+  },
+  "mps_mem_after_warmup": {
+    "allocated": 1963706112,
+    "driver": 3915497472
+  },
+  "results": {
+    "short": {
+      "audio_seconds": 7.2,
+      "wall_median": 6.126767875000951,
+      "wall_p95": 6.200099625000803,
+      "wall_min": 5.30335741700037,
+      "rtf_median": 0.8509399826390209,
+      "stages_median_ms": {
+        "tokenize_text": 0.9111670005950145,
+        "prepare_reference": 3.427916999498848,
+        "predict_duration": 235.35795799944026,
+        "sample_rf": 3976.7763750005543,
+        "unpatchify_latent": 0.0056249991757795215,
+        "decode_latent": 1956.099708999318
+      },
+      "audio_hashes": [
+        "08512a61db5877bb2e613d06cf0a0e0a85df6cbe687387cafd6314f6e8fa120d",
+        "69e5dc8a4b35552d4861f6b3e45b07ff2defca26e5d0057a7248bf3144c9545f",
+        "a43712f1d8ef96841523e12e045532b8a7c34c79ae22a56b8dc5134645cba6f9"
+      ],
+      "deterministic": false,
+      "mps_mem_window": {
+        "max_current_allocated_mib": 2127.8037109375,
+        "max_driver_allocated_mib": 3735.453125,
+        "n": 423.0
+      },
+      "mps_mem_after": {
+        "allocated": 1963706112,
+        "driver": 3915513856
+      },
+      "messages": [
+        "info: reference loudness normalize enabled per clip (target_db=-16.00, includes peak safety scaling).",
+        "info: speaker state served from L2 cache.",
+        "info: predicted duration frames=180.0, scale=1.000, using_frames=180 (7.200s).",
+        "info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only)."
+      ]
+    }
+  }
+}

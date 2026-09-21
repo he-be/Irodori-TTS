@@ -1,0 +1,27 @@
+scikit-learn version 1.9.0 is not supported. Minimum required version: 0.17. Maximum required version: 1.5.1. Disabling scikit-learn conversion API.
+Torch version 2.10.0 has not been tested with coremltools. You may run into unexpected errors. Torch 2.7.0 is the most recent version that has been tested.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[codec] dacvae: hf://Aratako/Semantic-DACVAE-Japanese-32dim -> /Users/mh/.cache/huggingface/hub/models--Aratako--Semantic-DACVAE-Japanese-32dim/snapshots/47376ee24834d7a05a48ebabfe3cde29b3c5e214/weights.pth
+/Users/mh/dev/Irodori-TTS/.venv/lib/python3.12/site-packages/torch/nn/utils/weight_norm.py:144: FutureWarning: `torch.nn.utils.weight_norm` is deprecated in favor of `torch.nn.utils.parametrizations.weight_norm`.
+  WeightNorm.apply(module, name, dim)
+[codec] folded weight_norm on 62 conv layers
+[S=180] torch fp32 out (1, 1, 345600) |ref| max 0.922
+/Users/mh/.local/share/uv/python/cpython-3.12.14-macos-aarch64-none/lib/python3.12/copyreg.py:99: FutureWarning: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+  return cls.__new__(cls, *args)
+[S=180] exported in 1.1s
+[S=180] converted in 27.2s
+[S=180] MIL ops: {'const': 308, 'conv': 27, 'mul': 58, 'sin': 29, 'pow': 29, 'add': 41, 'conv_transpose': 4, 'tanh': 1}
+[S=180] compiled in 0.1s
+[S=180] compute plan devices: {'MLNeuralEngineComputeDevice': 69, 'MLCPUComputeDevice': 120}
+[S=180] ops NOT on ANE: {('ios18.sin', 'MLCPUComputeDevice'): 29, ('ios18.pow', 'MLCPUComputeDevice'): 22, ('ios18.mul', 'MLCPUComputeDevice'): 44, ('ios18.add', 'MLCPUComputeDevice'): 1, ('ios18.conv_transpose', 'MLCPUComputeDevice'): 4, ('ios18.conv', 'MLCPUComputeDevice'): 19, ('ios18.tanh', 'MLCPUComputeDevice'): 1}
+[S=180] CPU_AND_NE: load 23.6s
+[S=180] CPU_AND_NE: predict median 1335.2 ms (min 1314.0), max|diff| 0.0195, SNR 40.9 dB
+[S=180] ALL: load 23.4s
+[S=180] ALL: predict median 2050.2 ms (min 2037.2), max|diff| 0.0031, SNR 54.1 dB
+[S=180] CPU_AND_GPU: load 0.2s
+[S=180] CPU_AND_GPU: predict median 1198.8 ms (min 1198.3), max|diff| 0.0017, SNR 59.5 dB
+[codec] dacvae: hf://Aratako/Semantic-DACVAE-Japanese-32dim -> /Users/mh/.cache/huggingface/hub/models--Aratako--Semantic-DACVAE-Japanese-32dim/snapshots/47376ee24834d7a05a48ebabfe3cde29b3c5e214/weights.pth
+/Users/mh/dev/Irodori-TTS/.venv/lib/python3.12/site-packages/torch/nn/utils/weight_norm.py:144: FutureWarning: `torch.nn.utils.weight_norm` is deprecated in favor of `torch.nn.utils.parametrizations.weight_norm`.
+  WeightNorm.apply(module, name, dim)
+[codec] folded weight_norm on 62 conv layers
+[S=180] MPS fp16 autocast eager: 1834.6 ms, max|diff| 0.0016, SNR 60.5 dB

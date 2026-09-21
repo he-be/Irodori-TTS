@@ -1,0 +1,178 @@
+{
+  "tag": "m1_mps_sway12_compile",
+  "timestamp": "2026-09-21T15:32:47",
+  "git_commit": "d94edd8",
+  "env": {
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "python": "3.12.14",
+    "torch": "2.10.0",
+    "device": "mps",
+    "machine": "arm64",
+    "macos": "27.0",
+    "mps_recommended_max_memory": 12713115648,
+    "env_overrides": []
+  },
+  "config": {
+    "checkpoint": "/Users/mh/.cache/huggingface/hub/models--Aratako--Irodori-TTS-v4.1-Small/snapshots/2b28324dc263ed5e6638b3cf3dd94c82ead07b4b/model.safetensors",
+    "precision": "fp16",
+    "codec_precision": "fp32",
+    "compile": true,
+    "compile_dynamic": false,
+    "num_steps": 12,
+    "t_schedule_mode": "sway",
+    "sway_coeff": -1.0,
+    "cfg_guidance_mode": "independent",
+    "seed": 1234,
+    "warmup": 1,
+    "repeats": 3,
+    "ref": "/Users/mh/dev/Irodori-TTS/outputs/sample.wav"
+  },
+  "load_sec": 8.013864875000081,
+  "warmup_sec_total": 193.62650295799995,
+  "mps_mem_after_load": {
+    "allocated": 1963619072,
+    "driver": 2731573248
+  },
+  "mps_mem_after_warmup": {
+    "allocated": 1964683520,
+    "driver": 7602798592
+  },
+  "results": {
+    "short": {
+      "audio_seconds": 7.2,
+      "wall_median": 4.043489707999925,
+      "wall_p95": 19.624870249999958,
+      "wall_min": 3.774314084000025,
+      "rtf_median": 0.5615957927777673,
+      "stages_median_ms": {
+        "tokenize_text": 0.6926660000772245,
+        "prepare_reference": 3.8703330001226277,
+        "predict_duration": 117.26283400003013,
+        "sample_rf": 1898.2310000001235,
+        "unpatchify_latent": 0.005957999974270933,
+        "decode_latent": 1945.2484999999342
+      },
+      "audio_hashes": [
+        "d071c5f5a1d6711685a0deeafcfa5e79affb4f69038778622b9d55596d48e3a8"
+      ],
+      "deterministic": true,
+      "mps_mem_window": {
+        "max_current_allocated_mib": 2385.263671875,
+        "max_driver_allocated_mib": 7251.921875,
+        "n": 628.0
+      },
+      "mps_mem_after": {
+        "allocated": 1964683520,
+        "driver": 7602798592
+      },
+      "messages": [
+        "info: reference loudness normalize enabled per clip (target_db=-16.00, includes peak safety scaling).",
+        "info: speaker state served from L2 cache.",
+        "info: predicted duration frames=179.9, scale=1.000, using_frames=180 (7.200s).",
+        "info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only)."
+      ]
+    },
+    "medium": {
+      "audio_seconds": 11.84,
+      "wall_median": 6.622356584000045,
+      "wall_p95": 6.940040833000012,
+      "wall_min": 6.331556624999848,
+      "rtf_median": 0.5593206574324362,
+      "stages_median_ms": {
+        "tokenize_text": 0.7123339998997835,
+        "prepare_reference": 2.924791999930676,
+        "predict_duration": 122.69945799994275,
+        "sample_rf": 3238.866749999943,
+        "unpatchify_latent": 0.005457999805003055,
+        "decode_latent": 3250.6400830000075
+      },
+      "audio_hashes": [
+        "b878c8f883054d43675584024fb3f55bfbd6758a9ef286f5793b0632830a3fed"
+      ],
+      "deterministic": true,
+      "mps_mem_window": {
+        "max_current_allocated_mib": 2657.23681640625,
+        "max_driver_allocated_mib": 7246.765625,
+        "n": 626.0
+      },
+      "mps_mem_after": {
+        "allocated": 1964683520,
+        "driver": 7596507136
+      },
+      "messages": [
+        "info: reference loudness normalize enabled per clip (target_db=-16.00, includes peak safety scaling).",
+        "info: speaker state served from L2 cache.",
+        "info: predicted duration frames=296.1, scale=1.000, using_frames=296 (11.840s).",
+        "info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only)."
+      ]
+    },
+    "long": {
+      "audio_seconds": 28.84,
+      "wall_median": 21.127833125000052,
+      "wall_p95": 21.21735554099996,
+      "wall_min": 20.312279833000048,
+      "rtf_median": 0.7325878337378658,
+      "stages_median_ms": {
+        "tokenize_text": 1.2311250000038854,
+        "prepare_reference": 3.4952910000356496,
+        "predict_duration": 392.8499579999425,
+        "sample_rf": 13348.488957999962,
+        "unpatchify_latent": 0.005417000011220807,
+        "decode_latent": 7378.567875000044
+      },
+      "audio_hashes": [
+        "657202bd1cb197a6619b98eb529597f3e89f257cbde7ae508ad5c376b1ebd34c"
+      ],
+      "deterministic": true,
+      "mps_mem_window": {
+        "max_current_allocated_mib": 3160.052001953125,
+        "max_driver_allocated_mib": 7381.875,
+        "n": 2099.0
+      },
+      "mps_mem_after": {
+        "allocated": 1964683520,
+        "driver": 7592312832
+      },
+      "messages": [
+        "info: reference loudness normalize enabled per clip (target_db=-16.00, includes peak safety scaling).",
+        "info: speaker state served from L2 cache.",
+        "info: predicted duration frames=720.9, scale=1.000, using_frames=721 (28.840s).",
+        "info: auto steps 12 -> 16 for a 28.8s output (IRODORI_OPT_AUTO_STEPS=0 to disable).",
+        "info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only)."
+      ]
+    },
+    "caption_noref": {
+      "audio_seconds": 7.32,
+      "wall_median": 4.174275791999889,
+      "wall_p95": 4.6259311660001,
+      "wall_min": 3.9313650409999354,
+      "rtf_median": 0.5702562557376898,
+      "stages_median_ms": {
+        "tokenize_text": 0.8499169998685829,
+        "prepare_reference": 0.3998749998572748,
+        "predict_duration": 145.38212499996916,
+        "sample_rf": 2021.35604099999,
+        "unpatchify_latent": 0.005749999900217517,
+        "decode_latent": 2003.619166999897
+      },
+      "audio_hashes": [
+        "165ac78db0653f9cda7211bc62d1b201ded22c5d7a842652f777c97833a2afec"
+      ],
+      "deterministic": true,
+      "mps_mem_window": {
+        "max_current_allocated_mib": 2390.75634765625,
+        "max_driver_allocated_mib": 7251.9375,
+        "n": 291.0
+      },
+      "mps_mem_after": {
+        "allocated": 1964683520,
+        "driver": 7602798592
+      },
+      "messages": [
+        "info: speaker conditioning is disabled for this checkpoint or request; ignoring cfg_scale_speaker.",
+        "info: predicted duration frames=183.0, scale=1.000, using_frames=183 (7.320s).",
+        "info: watermark disabled by IRODORI_OPT_WATERMARK=0 (local-only)."
+      ]
+    }
+  }
+}

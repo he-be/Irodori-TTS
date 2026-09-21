@@ -1,0 +1,14 @@
+{
+  "platform": "macOS-27.0-arm64-arm-64bit",
+  "machine": "Apple M1",
+  "torch": "2.10.0",
+  "recommended_max_memory_mib": 12124.171875,
+  "matmul4096_fp32_tflops": 1.584,
+  "matmul4096_fp32_ms": 86.785,
+  "matmul4096_fp16_tflops": 2.345,
+  "matmul4096_fp16_ms": 58.598,
+  "matmul4096_bf16_tflops": 1.132,
+  "matmul4096_bf16_ms": 121.412,
+  "copy_rw_gbs": 61.2,
+  "read_gbs": 62.8
+}

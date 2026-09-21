@@ -1,0 +1,21 @@
+/Users/mh/dev/Irodori-TTS/.venv/lib/python3.12/site-packages/torch/nn/utils/weight_norm.py:144: FutureWarning: `torch.nn.utils.weight_norm` is deprecated in favor of `torch.nn.utils.parametrizations.weight_norm`.
+  WeightNorm.apply(module, name, dim)
+scikit-learn version 1.9.0 is not supported. Minimum required version: 0.17. Maximum required version: 1.5.1. Disabling scikit-learn conversion API.
+Torch version 2.10.0 has not been tested with coremltools. You may run into unexpected errors. Torch 2.7.0 is the most recent version that has been tested.
+captured batches: [1, 3]
+scikit-learn version 1.9.0 is not supported. Minimum required version: 0.17. Maximum required version: 1.5.1. Disabling scikit-learn conversion API.
+Torch version 2.10.0 has not been tested with coremltools. You may run into unexpected errors. Torch 2.7.0 is the most recent version that has been tested.
+[ane] runner ready (dev, ne, 3 packages) in 3.5 s
+cpu fp32 copy: 0.9 s
+[ane] worker loaded a_b1 in 1.2 s
+B=1 S=180 bucket=192/CtxProfile(text=64, speaker=64, caption=16): MPS fp16 116.6 ms | ANE 37.4 ms (predict 39.3 ms, wait 39.4 ms) | CPU fp32 592 ms
+  ANE vs MPS16: max|d| 7.324e-02 mean|d| 2.894e-03 rel 3.604e-03
+  ANE vs CPU32: max|d| 6.034e-02 mean|d| 2.700e-03 rel 3.344e-03
+  MPS16 vs CPU32: max|d| 1.290e-02 mean|d| 1.141e-03 rel 1.360e-03
+  |v| ref scale: max 4.996 mean 0.840
+[ane] worker loaded a_b3 in 0.2 s
+B=3 S=180 bucket=192/CtxProfile(text=64, speaker=64, caption=16): MPS fp16 297.0 ms | ANE 102.4 ms (predict 109.8 ms, wait 109.9 ms) | CPU fp32 600 ms
+  ANE vs MPS16: max|d| 2.051e-02 mean|d| 1.591e-03 rel 1.941e-03
+  ANE vs CPU32: max|d| 4.139e-01 mean|d| 9.534e-03 rel 2.211e-02
+  MPS16 vs CPU32: max|d| 3.934e-01 mean|d| 9.022e-03 rel 2.162e-02
+  |v| ref scale: max 5.305 mean 0.873
