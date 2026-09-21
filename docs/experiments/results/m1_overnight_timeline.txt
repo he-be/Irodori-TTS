@@ -1,0 +1,30 @@
+=== STAGE build_full 2026-09-21T19:38:26
+[ane] runner ready (full, ne, 6 packages) in 2.9 s
+[ane] worker loaded a_b1 in 757.3 s
+[ane] worker loaded a_b2 in 4473.6 s
+[ane] worker loaded a_b3 in 2088.2 s
+[ane] worker loaded b_b1 in 773.8 s
+[ane] worker loaded b_b2 in 4101.5 s
+[ane] worker loaded b_b3 in 2100.8 s
+=== DONE build_full 2026-09-21T23:36:51
+=== STAGE check_ane_full 2026-09-21T23:36:51
+=== DONE check_ane_full 2026-09-22T00:24:03
+=== STAGE bench_full_allbranch 2026-09-22T00:24:03
+[ane] runner ready (full, ne, 6 packages) in 2.9 s
+[ane] worker loaded a_b3 in 2037.4 s
+[ane] worker loaded a_b1 in 765.7 s
+=== DONE bench_full_allbranch 2026-09-22T01:18:57
+=== STAGE bench_full_gpubranch 2026-09-22T01:18:57
+[ane] runner ready (full, ne, 6 packages) in 2.9 s
+[ane] worker loaded a_b2 in 4517.8 s
+[ane] worker loaded a_b1 in 764.8 s
+=== DONE bench_full_gpubranch 2026-09-22T02:53:21
+=== STAGE longform_full 2026-09-22T02:53:21
+[ane] runner ready (full, ne, 6 packages) in 2.9 s
+[ane] worker loaded a_b3 in 2032.0 s
+[ane] worker loaded a_b1 in 765.3 s
+=== DONE longform_full 2026-09-22T03:43:05
+=== STAGE concurrency_full 2026-09-22T03:43:05
+[ane] runner ready (full, ne, 6 packages) in 2.8 s
+[ane] worker loaded a_b3 in 2017.0 s
+[ane] worker loaded a_b1 in 765.7 s
