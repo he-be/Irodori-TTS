@@ -59,7 +59,7 @@ uv run python gradio_app_longform.py --server-port 7862
 ```
 IRODORI_OPT_ANE=1              ANE 経路を有効化
 IRODORI_OPT_ANE_GPU_BRANCHES=1 cond 分岐を GPU に回す
-IRODORI_OPT_ANE_SHAPES=full    23 種の latent 長 × 2 プロファイル
+IRODORI_OPT_ANE_SHAPES=full    23 種の latent 長 × 2 プロファイル（M1 は `m1`、16 / 17 節）
 IRODORI_OPT_COMPILE_DIT=1      GPU 側 DiT を torch.compile
 IRODORI_OPT_COMPILE_CODEC=1    codec decode を torch.compile
 ```

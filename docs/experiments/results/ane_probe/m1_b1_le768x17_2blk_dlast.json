@@ -1,0 +1,413 @@
+{
+ "tag": "m1_b1_le768x17_2blk_dlast",
+ "host": {
+  "chip": "Apple M1",
+  "macos": "27.0",
+  "coremltools": "9.0"
+ },
+ "package": {
+  "batch": 1,
+  "profile": "a",
+  "latents": [
+   32,
+   64,
+   96,
+   128,
+   160,
+   192,
+   224,
+   256,
+   288,
+   320,
+   384,
+   448,
+   512,
+   576,
+   640,
+   704,
+   768
+  ],
+  "ctx_pad_start": 0,
+  "default_index": -1,
+  "skip_model_load": false,
+  "blocks": 2,
+  "units": "ne",
+  "score_mib_max": 28.1,
+  "score_mib_sum": 147.2
+ },
+ "pre": {
+  "loadavg": [
+   1.5,
+   1.67,
+   1.66
+  ],
+  "swap": "total = 2048.00M  used = 1217.81M  free = 830.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 17930,
+    "pcpu": 0.0,
+    "etime": "01:44:39"
+   }
+  ],
+  "killed_stale": {
+   "before": [
+    {
+     "pid": 17930,
+     "pcpu": 0.0,
+     "etime": "01:44:39"
+    }
+   ],
+   "pkill_rc": 0,
+   "pkill_err": "",
+   "after_2s": [],
+   "after_5s": []
+  }
+ },
+ "convert_s": 67.6,
+ "convert_peak_rss_mib": 1920,
+ "compile_model_s": 0.1,
+ "disk_mib": 128,
+ "load": {
+  "status": "ok",
+  "wall_s": 75.4,
+  "load_s": 60.88,
+  "steps": [
+   {
+    "x_t": [
+     1,
+     32,
+     32
+    ],
+    "first_ms": 62.1,
+    "median_ms": 22.05
+   },
+   {
+    "x_t": [
+     1,
+     64,
+     32
+    ],
+    "first_ms": 36.2,
+    "median_ms": 29.43
+   },
+   {
+    "x_t": [
+     1,
+     96,
+     32
+    ],
+    "first_ms": 44.0,
+    "median_ms": 37.1
+   },
+   {
+    "x_t": [
+     1,
+     128,
+     32
+    ],
+    "first_ms": 51.7,
+    "median_ms": 44.72
+   },
+   {
+    "x_t": [
+     1,
+     160,
+     32
+    ],
+    "first_ms": 60.3,
+    "median_ms": 52.56
+   },
+   {
+    "x_t": [
+     1,
+     192,
+     32
+    ],
+    "first_ms": 71.3,
+    "median_ms": 61.0
+   },
+   {
+    "x_t": [
+     1,
+     224,
+     32
+    ],
+    "first_ms": 81.0,
+    "median_ms": 69.53
+   },
+   {
+    "x_t": [
+     1,
+     256,
+     32
+    ],
+    "first_ms": 87.4,
+    "median_ms": 78.47
+   },
+   {
+    "x_t": [
+     1,
+     288,
+     32
+    ],
+    "first_ms": 96.0,
+    "median_ms": 87.81
+   },
+   {
+    "x_t": [
+     1,
+     320,
+     32
+    ],
+    "first_ms": 107.8,
+    "median_ms": 97.69
+   },
+   {
+    "x_t": [
+     1,
+     384,
+     32
+    ],
+    "first_ms": 127.7,
+    "median_ms": 117.61
+   },
+   {
+    "x_t": [
+     1,
+     448,
+     32
+    ],
+    "first_ms": 150.4,
+    "median_ms": 137.21
+   },
+   {
+    "x_t": [
+     1,
+     512,
+     32
+    ],
+    "first_ms": 179.7,
+    "median_ms": 159.05
+   },
+   {
+    "x_t": [
+     1,
+     576,
+     32
+    ],
+    "first_ms": 203.6,
+    "median_ms": 183.43
+   },
+   {
+    "x_t": [
+     1,
+     640,
+     32
+    ],
+    "first_ms": 227.8,
+    "median_ms": 209.21
+   },
+   {
+    "x_t": [
+     1,
+     704,
+     32
+    ],
+    "first_ms": 254.6,
+    "median_ms": 234.66
+   },
+   {
+    "x_t": [
+     1,
+     768,
+     32
+    ],
+    "first_ms": 288.0,
+    "median_ms": 265.12
+   }
+  ]
+ },
+ "reload": {
+  "status": "ok",
+  "wall_s": 74.9,
+  "load_s": 60.27,
+  "steps": [
+   {
+    "x_t": [
+     1,
+     32,
+     32
+    ],
+    "first_ms": 63.5,
+    "median_ms": 22.18
+   },
+   {
+    "x_t": [
+     1,
+     64,
+     32
+    ],
+    "first_ms": 36.5,
+    "median_ms": 29.45
+   },
+   {
+    "x_t": [
+     1,
+     96,
+     32
+    ],
+    "first_ms": 44.1,
+    "median_ms": 37.37
+   },
+   {
+    "x_t": [
+     1,
+     128,
+     32
+    ],
+    "first_ms": 52.7,
+    "median_ms": 44.85
+   },
+   {
+    "x_t": [
+     1,
+     160,
+     32
+    ],
+    "first_ms": 60.6,
+    "median_ms": 52.91
+   },
+   {
+    "x_t": [
+     1,
+     192,
+     32
+    ],
+    "first_ms": 69.9,
+    "median_ms": 61.27
+   },
+   {
+    "x_t": [
+     1,
+     224,
+     32
+    ],
+    "first_ms": 78.0,
+    "median_ms": 69.9
+   },
+   {
+    "x_t": [
+     1,
+     256,
+     32
+    ],
+    "first_ms": 86.5,
+    "median_ms": 78.62
+   },
+   {
+    "x_t": [
+     1,
+     288,
+     32
+    ],
+    "first_ms": 97.2,
+    "median_ms": 87.92
+   },
+   {
+    "x_t": [
+     1,
+     320,
+     32
+    ],
+    "first_ms": 106.9,
+    "median_ms": 97.56
+   },
+   {
+    "x_t": [
+     1,
+     384,
+     32
+    ],
+    "first_ms": 125.8,
+    "median_ms": 116.55
+   },
+   {
+    "x_t": [
+     1,
+     448,
+     32
+    ],
+    "first_ms": 146.1,
+    "median_ms": 136.6
+   },
+   {
+    "x_t": [
+     1,
+     512,
+     32
+    ],
+    "first_ms": 174.0,
+    "median_ms": 159.2
+   },
+   {
+    "x_t": [
+     1,
+     576,
+     32
+    ],
+    "first_ms": 203.0,
+    "median_ms": 183.7
+   },
+   {
+    "x_t": [
+     1,
+     640,
+     32
+    ],
+    "first_ms": 235.5,
+    "median_ms": 210.71
+   },
+   {
+    "x_t": [
+     1,
+     704,
+     32
+    ],
+    "first_ms": 266.8,
+    "median_ms": 236.42
+   },
+   {
+    "x_t": [
+     1,
+     768,
+     32
+    ],
+    "first_ms": 289.7,
+    "median_ms": 265.43
+   }
+  ]
+ },
+ "log": {
+  "compilation_failed": 2,
+  "model_load_failed": 2,
+  "spiller_failure": 2,
+  "regalloc_l2_miss": 6,
+  "lines": 146
+ },
+ "verdict": "compile_failed",
+ "post": {
+  "loadavg": [
+   2.78,
+   2.36,
+   1.96
+  ],
+  "swap": "total = 2048.00M  used = 1161.81M  free = 886.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 19530,
+    "pcpu": 0.0,
+    "etime": "03:31"
+   }
+  ]
+ }
+}

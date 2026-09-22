@@ -1,0 +1,104 @@
+{
+ "tag": "m1_b1_le768x17_2blk_tmo20",
+ "host": {
+  "chip": "Apple M1",
+  "macos": "27.0",
+  "coremltools": "9.0"
+ },
+ "package": {
+  "batch": 1,
+  "profile": "a",
+  "latents": [
+   32,
+   64,
+   96,
+   128,
+   160,
+   192,
+   224,
+   256,
+   288,
+   320,
+   384,
+   448,
+   512,
+   576,
+   640,
+   704,
+   768
+  ],
+  "ctx_pad_start": 0,
+  "default_index": 0,
+  "skip_model_load": true,
+  "blocks": 2,
+  "units": "ne",
+  "score_mib_max": 28.1,
+  "score_mib_sum": 147.2
+ },
+ "pre": {
+  "loadavg": [
+   1.6,
+   1.55,
+   1.49
+  ],
+  "swap": "total = 2048.00M  used = 1161.81M  free = 886.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 19660,
+    "pcpu": 0.0,
+    "etime": "01:10:50"
+   }
+  ],
+  "killed_stale": {
+   "before": [
+    {
+     "pid": 19660,
+     "pcpu": 0.0,
+     "etime": "01:10:50"
+    }
+   ],
+   "pkill_rc": 0,
+   "pkill_err": "",
+   "after_2s": [],
+   "after_5s": []
+  }
+ },
+ "convert_s": 7.1,
+ "convert_peak_rss_mib": 1612,
+ "compile_model_s": 0.1,
+ "disk_mib": 128,
+ "load": {
+  "status": "timeout",
+  "wall_s": 20.0
+ },
+ "timeout_kill": {
+  "before": [
+   {
+    "pid": 19826,
+    "pcpu": 100.0,
+    "etime": "00:14"
+   }
+  ],
+  "pkill_rc": 0,
+  "pkill_err": "",
+  "after_2s": [],
+  "after_22s": []
+ },
+ "log": {
+  "compilation_failed": 0,
+  "model_load_failed": 0,
+  "spiller_failure": 0,
+  "regalloc_l2_miss": 0,
+  "lines": 68
+ },
+ "verdict": "timeout",
+ "post": {
+  "loadavg": [
+   1.77,
+   1.61,
+   1.52
+  ],
+  "swap": "total = 2048.00M  used = 1153.81M  free = 894.19M  (encrypted)",
+  "compiler": []
+ }
+}

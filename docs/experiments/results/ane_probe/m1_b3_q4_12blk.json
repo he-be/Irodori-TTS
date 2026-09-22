@@ -1,0 +1,166 @@
+{
+ "tag": "m1_b3_q4_12blk",
+ "host": {
+  "chip": "Apple M1",
+  "macos": "27.0",
+  "coremltools": "9.0"
+ },
+ "package": {
+  "batch": 3,
+  "profile": "a",
+  "latents": [
+   192,
+   320,
+   512,
+   768
+  ],
+  "ctx_pad_start": 0,
+  "default_index": 0,
+  "skip_model_load": true,
+  "blocks": 12,
+  "units": "ne",
+  "score_mib_max": 80.9,
+  "score_mib_sum": 144.2
+ },
+ "pre": {
+  "loadavg": [
+   1.43,
+   1.78,
+   1.74
+  ],
+  "swap": "total = 2048.00M  used = 1145.81M  free = 902.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 20492,
+    "pcpu": 0.0,
+    "etime": "12:48"
+   }
+  ],
+  "killed_stale": {
+   "before": [
+    {
+     "pid": 20492,
+     "pcpu": 0.0,
+     "etime": "12:48"
+    }
+   ],
+   "pkill_rc": 0,
+   "pkill_err": "",
+   "after_2s": [],
+   "after_5s": []
+  }
+ },
+ "convert_s": 39.9,
+ "convert_peak_rss_mib": 3513,
+ "compile_model_s": 0.3,
+ "disk_mib": 698,
+ "load": {
+  "status": "ok",
+  "wall_s": 669.3,
+  "load_s": 657.91,
+  "steps": [
+   {
+    "x_t": [
+     3,
+     192,
+     32
+    ],
+    "first_ms": 171.0,
+    "median_ms": 105.13
+   },
+   {
+    "x_t": [
+     3,
+     320,
+     32
+    ],
+    "first_ms": 272.1,
+    "median_ms": 198.28
+   },
+   {
+    "x_t": [
+     3,
+     512,
+     32
+    ],
+    "first_ms": 439.5,
+    "median_ms": 357.69
+   },
+   {
+    "x_t": [
+     3,
+     768,
+     32
+    ],
+    "first_ms": 689.3,
+    "median_ms": 602.36
+   }
+  ]
+ },
+ "reload": {
+  "status": "ok",
+  "wall_s": 11.9,
+  "load_s": 0.13,
+  "steps": [
+   {
+    "x_t": [
+     3,
+     192,
+     32
+    ],
+    "first_ms": 165.4,
+    "median_ms": 104.75
+   },
+   {
+    "x_t": [
+     3,
+     320,
+     32
+    ],
+    "first_ms": 282.2,
+    "median_ms": 197.92
+   },
+   {
+    "x_t": [
+     3,
+     512,
+     32
+    ],
+    "first_ms": 436.5,
+    "median_ms": 356.8
+   },
+   {
+    "x_t": [
+     3,
+     768,
+     32
+    ],
+    "first_ms": 687.4,
+    "median_ms": 602.43
+   }
+  ]
+ },
+ "log": {
+  "compilation_failed": 0,
+  "model_load_failed": 0,
+  "spiller_failure": 0,
+  "regalloc_l2_miss": 2,
+  "lines": 103
+ },
+ "verdict": "ane_ok",
+ "post": {
+  "loadavg": [
+   1.59,
+   1.8,
+   1.78
+  ],
+  "swap": "total = 2048.00M  used = 1145.81M  free = 902.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 20674,
+    "pcpu": 0.0,
+    "etime": "11:15"
+   }
+  ]
+ }
+}

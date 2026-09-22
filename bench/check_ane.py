@@ -39,7 +39,7 @@ from irodori_tts.inference_runtime import (  # noqa: E402
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default="short", choices=sorted(INPUTS))
-    parser.add_argument("--shapes", default="dev", choices=["dev", "full"])
+    parser.add_argument("--shapes", default="dev", choices=["dev", "full", "m1"])
     parser.add_argument("--units", default="ne", choices=["ne", "all", "gpu", "cpu"])
     parser.add_argument("--repeats", type=int, default=10)
     parser.add_argument("--skip-cpu", action="store_true", help="skip the CPU fp32 reference")

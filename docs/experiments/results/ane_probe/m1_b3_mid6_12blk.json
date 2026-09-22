@@ -1,0 +1,185 @@
+{
+ "tag": "m1_b3_mid6_12blk",
+ "host": {
+  "chip": "Apple M1",
+  "macos": "27.0",
+  "coremltools": "9.0"
+ },
+ "package": {
+  "batch": 3,
+  "profile": "a",
+  "latents": [
+   192,
+   256,
+   320,
+   448,
+   576,
+   768
+  ],
+  "ctx_pad_start": 0,
+  "default_index": 0,
+  "skip_model_load": true,
+  "blocks": 12,
+  "units": "ne",
+  "score_mib_max": 81.5,
+  "score_mib_sum": 196.9
+ },
+ "pre": {
+  "loadavg": [
+   1.77,
+   1.61,
+   1.52
+  ],
+  "swap": "total = 2048.00M  used = 1153.81M  free = 894.19M  (encrypted)",
+  "compiler": []
+ },
+ "convert_s": 39.9,
+ "convert_peak_rss_mib": 3508,
+ "compile_model_s": 0.3,
+ "disk_mib": 698,
+ "load": {
+  "status": "ok",
+  "wall_s": 1021.2,
+  "load_s": 1006.41,
+  "steps": [
+   {
+    "x_t": [
+     3,
+     192,
+     32
+    ],
+    "first_ms": 177.4,
+    "median_ms": 104.73
+   },
+   {
+    "x_t": [
+     3,
+     256,
+     32
+    ],
+    "first_ms": 242.2,
+    "median_ms": 143.88
+   },
+   {
+    "x_t": [
+     3,
+     320,
+     32
+    ],
+    "first_ms": 300.1,
+    "median_ms": 198.24
+   },
+   {
+    "x_t": [
+     3,
+     448,
+     32
+    ],
+    "first_ms": 405.1,
+    "median_ms": 306.71
+   },
+   {
+    "x_t": [
+     3,
+     576,
+     32
+    ],
+    "first_ms": 530.2,
+    "median_ms": 426.4
+   },
+   {
+    "x_t": [
+     3,
+     768,
+     32
+    ],
+    "first_ms": 708.3,
+    "median_ms": 601.8
+   }
+  ]
+ },
+ "reload": {
+  "status": "ok",
+  "wall_s": 15.0,
+  "load_s": 0.14,
+  "steps": [
+   {
+    "x_t": [
+     3,
+     192,
+     32
+    ],
+    "first_ms": 179.0,
+    "median_ms": 105.06
+   },
+   {
+    "x_t": [
+     3,
+     256,
+     32
+    ],
+    "first_ms": 247.0,
+    "median_ms": 144.16
+   },
+   {
+    "x_t": [
+     3,
+     320,
+     32
+    ],
+    "first_ms": 303.8,
+    "median_ms": 198.15
+   },
+   {
+    "x_t": [
+     3,
+     448,
+     32
+    ],
+    "first_ms": 413.8,
+    "median_ms": 306.41
+   },
+   {
+    "x_t": [
+     3,
+     576,
+     32
+    ],
+    "first_ms": 532.9,
+    "median_ms": 426.85
+   },
+   {
+    "x_t": [
+     3,
+     768,
+     32
+    ],
+    "first_ms": 711.4,
+    "median_ms": 602.93
+   }
+  ]
+ },
+ "log": {
+  "compilation_failed": 0,
+  "model_load_failed": 0,
+  "spiller_failure": 0,
+  "regalloc_l2_miss": 4,
+  "lines": 108
+ },
+ "verdict": "ane_ok",
+ "post": {
+  "loadavg": [
+   1.52,
+   1.74,
+   1.67
+  ],
+  "swap": "total = 2048.00M  used = 1145.81M  free = 902.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 19872,
+    "pcpu": 0.0,
+    "etime": "17:08"
+   }
+  ]
+ }
+}

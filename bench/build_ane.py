@@ -27,7 +27,7 @@ from irodori_tts.inference_runtime import (  # noqa: E402
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--hf-checkpoint", default="Aratako/Irodori-TTS-v4.1-Small")
-    parser.add_argument("--shapes", default="full", choices=["dev", "full"])
+    parser.add_argument("--shapes", default="full", choices=["dev", "full", "m1"])
     parser.add_argument("--units", default="ne", choices=["ne", "all", "gpu", "cpu"])
     args = parser.parse_args()
     ck = download_hf_checkpoint(args.hf_checkpoint)

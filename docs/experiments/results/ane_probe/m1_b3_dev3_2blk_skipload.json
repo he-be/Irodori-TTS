@@ -1,0 +1,147 @@
+{
+ "tag": "m1_b3_dev3_2blk_skipload",
+ "host": {
+  "chip": "Apple M1",
+  "macos": "27.0",
+  "coremltools": "9.0"
+ },
+ "package": {
+  "batch": 3,
+  "profile": "a",
+  "latents": [
+   192,
+   320,
+   768
+  ],
+  "ctx_pad_start": 0,
+  "default_index": 0,
+  "skip_model_load": true,
+  "blocks": 2,
+  "units": "ne",
+  "score_mib_max": 80.7,
+  "score_mib_sum": 105.2
+ },
+ "pre": {
+  "loadavg": [
+   2.63,
+   2.34,
+   1.95
+  ],
+  "swap": "total = 2048.00M  used = 1161.81M  free = 886.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 19530,
+    "pcpu": 0.0,
+    "etime": "03:35"
+   }
+  ],
+  "killed_stale": {
+   "before": [
+    {
+     "pid": 19530,
+     "pcpu": 0.0,
+     "etime": "03:35"
+    }
+   ],
+   "pkill_rc": 0,
+   "pkill_err": "",
+   "after_2s": [],
+   "after_5s": []
+  }
+ },
+ "convert_s": 7.4,
+ "convert_peak_rss_mib": 1618,
+ "compile_model_s": 0.1,
+ "disk_mib": 128,
+ "load": {
+  "status": "ok",
+  "wall_s": 55.3,
+  "load_s": 51.23,
+  "steps": [
+   {
+    "x_t": [
+     3,
+     192,
+     32
+    ],
+    "first_ms": 63.9,
+    "median_ms": 19.86
+   },
+   {
+    "x_t": [
+     3,
+     320,
+     32
+    ],
+    "first_ms": 75.4,
+    "median_ms": 36.98
+   },
+   {
+    "x_t": [
+     3,
+     768,
+     32
+    ],
+    "first_ms": 146.1,
+    "median_ms": 106.82
+   }
+  ]
+ },
+ "reload": {
+  "status": "ok",
+  "wall_s": 4.1,
+  "load_s": 0.05,
+  "steps": [
+   {
+    "x_t": [
+     3,
+     192,
+     32
+    ],
+    "first_ms": 56.4,
+    "median_ms": 19.72
+   },
+   {
+    "x_t": [
+     3,
+     320,
+     32
+    ],
+    "first_ms": 74.8,
+    "median_ms": 36.86
+   },
+   {
+    "x_t": [
+     3,
+     768,
+     32
+    ],
+    "first_ms": 141.8,
+    "median_ms": 106.52
+   }
+  ]
+ },
+ "log": {
+  "compilation_failed": 0,
+  "model_load_failed": 0,
+  "spiller_failure": 0,
+  "regalloc_l2_miss": 0,
+  "lines": 89
+ },
+ "verdict": "ane_ok",
+ "post": {
+  "loadavg": [
+   1.99,
+   2.22,
+   1.94
+  ],
+  "swap": "total = 2048.00M  used = 1161.81M  free = 886.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 19631,
+    "pcpu": 0.0,
+    "etime": "00:59"
+   }
+  ]
+ }
+}

@@ -34,6 +34,7 @@ import hashlib
 import json
 import multiprocessing as mp
 import os
+import platform
 import shutil
 import time
 from dataclasses import dataclass
@@ -98,6 +99,13 @@ S_BUCKETS_FULL = (
     896, 1024, 1152, 1280, 1408, 1536,
 )
 S_BUCKETS_DEV = (192, 320, 768)
+# M1 (17-m1-ane-factors.md 2-2): a package that mixes buckets below 192 with large ones fails the
+# ANE compiler (register spiller) from 2 blocks up, so the M1 set starts at 192. Batch 3 also has
+# a limit on the number of enumerated shapes at 12 layers: batch 3 loads 6 and fails 9, batch 2
+# loads 6 (590 s) and fails 18 (the same register-spiller failure, reached after 74 min of
+# compiling; 17-m1-ane-factors.md 2-2). The 6-bucket list is the largest enumeration measured to load.
+S_BUCKETS_M1 = tuple(s for s in S_BUCKETS_FULL if s >= 192)
+S_BUCKETS_M1_B23 = (192, 256, 320, 448, 576, 768)
 BATCHES = (1, 2, 3)
 # Largest latent bucket per batch size. A batch-3 package enumerated up to 1536 frames takes
 # the ANE compiler 315 s and then runs on the CPU (13-ane.md 5-1); longer requests at batch 3
@@ -124,8 +132,18 @@ def shape_packages(name: str) -> dict[str, list[Shape]]:
         buckets, profiles = S_BUCKETS_DEV, ("a",)
     elif name == "full":
         buckets, profiles = S_BUCKETS_FULL, ("a", "b")
+    elif name == "m1":
+        # Measured to load on the M1 (17-m1-ane-factors.md 2-2): profile a and b at batch 1 with
+        # 18 buckets, profile a at batch 2 and 3 with 6. Profile b at batch 2 / 3 is unmeasured,
+        # so those requests take MPS.
+        return {
+            package_key("a", 1): _shapes_for(1, PROFILES["a"], S_BUCKETS_M1),
+            package_key("b", 1): _shapes_for(1, PROFILES["b"], S_BUCKETS_M1),
+            package_key("a", 2): _shapes_for(2, PROFILES["a"], S_BUCKETS_M1_B23),
+            package_key("a", 3): _shapes_for(3, PROFILES["a"], S_BUCKETS_M1_B23),
+        }
     else:
-        raise ValueError(f"unknown ANE shape set {name!r} (expected dev|full)")
+        raise ValueError(f"unknown ANE shape set {name!r} (expected dev|full|m1)")
     return {
         package_key(p, b): _shapes_for(b, PROFILES[p], buckets) for p in profiles for b in BATCHES
     }
@@ -355,6 +373,11 @@ def default_cache_dir() -> Path:
     return Path(os.environ.get("IRODORI_OPT_ANE_CACHE_DIR", "~/.cache/irodori-tts/ane")).expanduser()
 
 
+def failed_marker_path(mlmodelc: Path) -> Path:
+    """Sidecar written when the ANE compiler rejects a package (see ``ensure_packages``)."""
+    return mlmodelc.with_suffix(".ane_failed.json")
+
+
 def _cpu_wrapper(model: TextToLatentRFDiT) -> AneStepModule:
     parts = nn.ModuleDict(
         {
@@ -386,12 +409,14 @@ def export_package(
     mlpackage: Path,
     log: bool = True,
     default_index: int = 0,
-    skip_model_load: bool = False,
+    skip_model_load: bool = True,
 ) -> None:
     """torch.export the step (batch fixed, latent/context lengths symbolic) on a CPU fp32 copy and
     convert it with one enumerated shape per latent bucket. ``default_index`` picks the default
-    enumerated shape; ``skip_model_load`` stops ``ct.convert`` from loading (= ANE-compiling) the
-    result. Both are probe knobs (bench/probe_ane_shapes.py)."""
+    enumerated shape (a probe knob, bench/probe_ane_shapes.py; measured to change nothing).
+    ``skip_model_load=True`` stops ``ct.convert`` from loading the result: that load is a full ANE
+    compile which the worker redoes from the compiled path anyway, so it only cost build time
+    (58 -> 7 s per 2-block package, 17-m1-ane-factors.md 2-5)."""
     import coremltools as ct
 
     dims = Dims.from_model(model)
@@ -464,18 +489,37 @@ def ensure_packages(
     log: bool = True,
     only: set[str] | None = None,
 ) -> tuple[dict[str, Path], dict[str, list[Shape]]]:
-    """Return {package_key: compiled .mlmodelc path}, exporting/compiling on a cache miss."""
+    """Return {package_key: compiled .mlmodelc path}, exporting/compiling on a cache miss.
+
+    A package whose ANE compile failed on this machine (marker written by ``AneStepRunner``)
+    is left out, so its shapes take the MPS path instead of a silent CPU fallback. The marker is
+    ignored after a macOS update (the compiler may have changed)."""
     import coremltools as ct
 
     packages = shape_packages(shapes_name)
     cache_dir.mkdir(parents=True, exist_ok=True)
     compiled: dict[str, Path] = {}
-    for pkg_key, shapes in packages.items():
+    for pkg_key, shapes in list(packages.items()):
         if only is not None and pkg_key not in only:
             continue
         stem = f"{pkg_key}_{cache_key(model, shapes)}"
         mlpackage = cache_dir / f"{stem}.mlpackage"
         mlmodelc = cache_dir / f"{stem}.mlmodelc"
+        marker = failed_marker_path(mlmodelc)
+        if marker.exists():
+            try:
+                mark = json.loads(marker.read_text())
+            except (OSError, ValueError):
+                mark = {}
+            if mark.get("os") == platform.mac_ver()[0]:
+                if log:
+                    print(
+                        f"[ane] skipping {pkg_key}: ANE compile failed on this machine "
+                        f"({marker.name}); its shapes use MPS",
+                        flush=True,
+                    )
+                packages.pop(pkg_key)
+                continue
         if not mlmodelc.exists():
             if not mlpackage.exists():
                 export_package(model, shapes, mlpackage, log=log)
@@ -522,10 +566,13 @@ class AneStepRunner:
             model, shapes_name, cache_dir or default_cache_dir(), log=log
         )
         self.packages = packages
+        self._compiled = compiled
         self._profile_keys = [k for k in PROFILES if any(pk.startswith(k + "_") for pk in packages)]
         self._profile_keys.sort(key=lambda k: PROFILES[k].text + PROFILES[k].speaker + PROFILES[k].caption)
 
-        all_shapes = [s for v in packages.values() for s in v]
+        # Size the shared blocks from the unfiltered set: ``packages`` may have lost entries whose
+        # ANE compile failed (possibly all of them, in which case every request takes the GPU path).
+        all_shapes = [s for v in shape_packages(shapes_name).values() for s in v]
         big = Shape(
             max(BATCHES),
             max(s.latent for s in all_shapes),
@@ -570,8 +617,43 @@ class AneStepRunner:
     def preload(self, keys: list[str] | None = None) -> None:
         for key in keys or list(self.packages):
             info = self._call(("load", key))
-            if self.log and info and info.get("load_sec", 0.0) > 0.0:
+            self._after_load(key, info)
+
+    def _after_load(self, key: str, info: dict | None) -> bool:
+        """Log a worker load; on an ANE compile failure drop the package (its shapes fall back to
+        MPS from now on) and leave a marker so the next process does not retry. Returns False
+        when the package was dropped."""
+        if not info or info.get("load_sec", 0.0) <= 0.0:
+            return True
+        failed = info.get("ane_failed")
+        if failed is None:
+            if self.log:
                 print(f"[ane] worker loaded {key} in {info['load_sec']:.1f} s", flush=True)
+            return True
+        self.packages.pop(key, None)
+        self._profile_keys = [
+            k for k in self._profile_keys if any(pk.startswith(k + "_") for pk in self.packages)
+        ]
+        mlmodelc = self._compiled.get(key)
+        if mlmodelc is not None:
+            failed_marker_path(mlmodelc).write_text(
+                json.dumps(
+                    {
+                        "package": key,
+                        "os": platform.mac_ver()[0],
+                        "load_sec": round(info["load_sec"], 1),
+                        "log": failed,
+                        "when": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                    indent=1,
+                )
+            )
+        print(
+            f"[ane] WARNING: ANE compile of {key} failed after {info['load_sec']:.0f} s "
+            f"(aned log: {failed}); its shapes use MPS from now on",
+            flush=True,
+        )
+        return False
 
     # -- protocol helpers
     def _call(self, msg: tuple) -> dict | None:
@@ -667,8 +749,8 @@ class AneStepRunner:
         key = f"ctx{self._ctx_seq}"
         shapes = {n: want[n] for n in CTX_INPUT_NAMES}
         info = self._call(("ctx", key, pkg, shapes))
-        if self.log and info and info.get("load_sec", 0.0) > 0.0:
-            print(f"[ane] worker loaded {pkg} in {info['load_sec']:.1f} s", flush=True)
+        if not self._after_load(pkg, info):
+            return None  # caller falls back to the GPU path for this request
         self.stats["ctx"] += 1
         return AneContext(key=key, shape=shape, latent_len=int(latent_len), package=pkg)
 

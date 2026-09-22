@@ -41,8 +41,9 @@ memory), the MPS backend, batch size 1. Every switch can be toggled through an
     IRODORI_OPT_ANE_GPU_COND=0     give the GPU the tail (uncond) branch instead of the cond branch
     IRODORI_OPT_ANE_NOCFG_GPU=1    run the no-CFG steps (t < cfg_min_t) on the GPU instead of the ANE
     IRODORI_OPT_ANE_CANDIDATES=0   with num_candidates=2, do not split candidate 0 -> ANE, 1 -> GPU
-    IRODORI_OPT_ANE_SHAPES=dev|full enumerated shape set (default full; dev: 3 latent buckets x batch 1-3,
-                                   full: 23 buckets x 2 context profiles; first build is minutes)
+    IRODORI_OPT_ANE_SHAPES=dev|full|m1 enumerated shape set (default full; dev: 3 latent buckets x
+                                   batch 1-3, full: 23 buckets x 2 context profiles, m1: the set
+                                   that loads on an M1's ANE, 17-m1-ane-factors.md; first build is minutes)
     IRODORI_OPT_ANE_UNITS=ne|all|gpu|cpu  Core ML compute units for the worker (default ne)
     IRODORI_OPT_ANE_LOG=0          silence the [ane] load / per-request lines
     IRODORI_OPT_ANE_CACHE_DIR=path where exported/compiled Core ML packages live
@@ -149,7 +150,7 @@ class OptConfig:
             ane_gpu_cond=_env_bool("IRODORI_OPT_ANE_GPU_COND", True),
             ane_nocfg_gpu=_env_bool("IRODORI_OPT_ANE_NOCFG_GPU", False),
             ane_candidates=_env_bool("IRODORI_OPT_ANE_CANDIDATES", True),
-            ane_shapes=_env_str("IRODORI_OPT_ANE_SHAPES", "full", ("dev", "full")),
+            ane_shapes=_env_str("IRODORI_OPT_ANE_SHAPES", "full", ("dev", "full", "m1")),
             ane_units=_env_str("IRODORI_OPT_ANE_UNITS", "ne", ("ne", "all", "gpu", "cpu")),
             ane_log=_env_bool("IRODORI_OPT_ANE_LOG", True),
         )

@@ -1,0 +1,261 @@
+{
+ "tag": "m1_b3_n9_12blk",
+ "host": {
+  "chip": "Apple M1",
+  "macos": "27.0",
+  "coremltools": "9.0"
+ },
+ "package": {
+  "batch": 3,
+  "profile": "a",
+  "latents": [
+   192,
+   224,
+   256,
+   320,
+   384,
+   448,
+   512,
+   640,
+   768
+  ],
+  "ctx_pad_start": 0,
+  "default_index": 0,
+  "skip_model_load": true,
+  "blocks": 12,
+  "units": "ne",
+  "score_mib_max": 82.3,
+  "score_mib_sum": 281.7
+ },
+ "pre": {
+  "loadavg": [
+   1.63,
+   1.8,
+   1.78
+  ],
+  "swap": "total = 2048.00M  used = 1145.81M  free = 902.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 20674,
+    "pcpu": 0.0,
+    "etime": "11:19"
+   }
+  ],
+  "killed_stale": {
+   "before": [
+    {
+     "pid": 20674,
+     "pcpu": 0.0,
+     "etime": "11:19"
+    }
+   ],
+   "pkill_rc": 0,
+   "pkill_err": "",
+   "after_2s": [],
+   "after_5s": []
+  }
+ },
+ "convert_s": 39.9,
+ "convert_peak_rss_mib": 3510,
+ "compile_model_s": 0.3,
+ "disk_mib": 698,
+ "load": {
+  "status": "ok",
+  "wall_s": 1358.1,
+  "load_s": 1220.3,
+  "steps": [
+   {
+    "x_t": [
+     3,
+     192,
+     32
+    ],
+    "first_ms": 1171.7,
+    "median_ms": 933.38
+   },
+   {
+    "x_t": [
+     3,
+     224,
+     32
+    ],
+    "first_ms": 1180.1,
+    "median_ms": 1098.65
+   },
+   {
+    "x_t": [
+     3,
+     256,
+     32
+    ],
+    "first_ms": 1393.2,
+    "median_ms": 1316.78
+   },
+   {
+    "x_t": [
+     3,
+     320,
+     32
+    ],
+    "first_ms": 1808.6,
+    "median_ms": 1726.18
+   },
+   {
+    "x_t": [
+     3,
+     384,
+     32
+    ],
+    "first_ms": 2252.1,
+    "median_ms": 2101.85
+   },
+   {
+    "x_t": [
+     3,
+     448,
+     32
+    ],
+    "first_ms": 2789.6,
+    "median_ms": 2513.97
+   },
+   {
+    "x_t": [
+     3,
+     512,
+     32
+    ],
+    "first_ms": 3105.8,
+    "median_ms": 2961.91
+   },
+   {
+    "x_t": [
+     3,
+     640,
+     32
+    ],
+    "first_ms": 4300.1,
+    "median_ms": 4124.37
+   },
+   {
+    "x_t": [
+     3,
+     768,
+     32
+    ],
+    "first_ms": 5543.5,
+    "median_ms": 5348.75
+   }
+  ]
+ },
+ "reload": {
+  "status": "ok",
+  "wall_s": 1354.3,
+  "load_s": 1215.09,
+  "steps": [
+   {
+    "x_t": [
+     3,
+     192,
+     32
+    ],
+    "first_ms": 1178.6,
+    "median_ms": 936.86
+   },
+   {
+    "x_t": [
+     3,
+     224,
+     32
+    ],
+    "first_ms": 1184.8,
+    "median_ms": 1106.39
+   },
+   {
+    "x_t": [
+     3,
+     256,
+     32
+    ],
+    "first_ms": 1402.0,
+    "median_ms": 1326.6
+   },
+   {
+    "x_t": [
+     3,
+     320,
+     32
+    ],
+    "first_ms": 1811.1,
+    "median_ms": 1721.0
+   },
+   {
+    "x_t": [
+     3,
+     384,
+     32
+    ],
+    "first_ms": 2206.1,
+    "median_ms": 2099.77
+   },
+   {
+    "x_t": [
+     3,
+     448,
+     32
+    ],
+    "first_ms": 2647.5,
+    "median_ms": 2540.19
+   },
+   {
+    "x_t": [
+     3,
+     512,
+     32
+    ],
+    "first_ms": 3127.2,
+    "median_ms": 2996.18
+   },
+   {
+    "x_t": [
+     3,
+     640,
+     32
+    ],
+    "first_ms": 4668.4,
+    "median_ms": 4122.86
+   },
+   {
+    "x_t": [
+     3,
+     768,
+     32
+    ],
+    "first_ms": 5620.2,
+    "median_ms": 5418.36
+   }
+  ]
+ },
+ "log": {
+  "compilation_failed": 2,
+  "model_load_failed": 2,
+  "spiller_failure": 2,
+  "regalloc_l2_miss": 8,
+  "lines": 267
+ },
+ "verdict": "compile_failed",
+ "post": {
+  "loadavg": [
+   1.92,
+   1.84,
+   1.76
+  ],
+  "swap": "total = 2048.00M  used = 1145.81M  free = 902.19M  (encrypted)",
+  "compiler": [
+   {
+    "pid": 20840,
+    "pcpu": 0.0,
+    "etime": "45:00"
+   }
+  ]
+ }
+}
