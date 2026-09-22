@@ -354,6 +354,15 @@ GPU 分岐 0 を既定にする（17 節 3-2。環境変数を明示すればそ
 M3 Pro の既定のまま）。実機確認（09-22 19:2x、環境変数なし、short）: `runner ready (m1, ne, 5 packages)`、
 `gpu_branches=0`、2630 ms（RTF 0.365）。
 
+MBP など別の機械から使う（実測、09-22 夜）: mini で `--server-name 0.0.0.0` を付けて起動し、ブラウザで
+`http://mhnoMac-mini.local:7860`（MBP から HTTP 200、0.27 s）。既定の `127.0.0.1` のまま起動するなら
+`ssh -L 7860:127.0.0.1:7860 mh@mhnoMac-mini.local` で `http://127.0.0.1:7860`。ssh から起動して切断後も残すには `nohup ... &`。
+
+```sh
+ssh mh@mhnoMac-mini.local
+cd ~/dev/Irodori-TTS && nohup uv run --no-sync python gradio_app.py --server-name 0.0.0.0 > ~/gradio.log 2>&1 &
+```
+
 09-22 昼までの推奨だった `IRODORI_OPT_ANE_SHAPES=dev` は bucket が 3 つしかなく、150 字超の本文が MPS に落ちる。
 `m1`（5 package、初回ビルド約 57 分、17 節 4-4）が上位互換。「2 ワーカーでスループット 2 倍」は誤りだった（4-7 の訂正）。
 
