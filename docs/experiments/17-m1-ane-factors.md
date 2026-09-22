@@ -139,9 +139,12 @@ mini の repo には `bench/probe_ane_shapes.py`（未追跡）と `irodori_tts/
 6. （16 節の再訂正は済）メモリ `m1-mini-tts-server.md` の更新、コミット。
 7. （済、0-2 の set6 と 4-4）b_b3 × 6 形と b1 / b_b1 の 768 までの 12 形が載り、`m1` を 5 package に書き換えて再測した。
    (a) 再起動後の 2 ワーカー再測も済（4-2-1）: 16 節 4-7 の 1.97× は測定窓のずれで、実際は 1.14×。
-8. 検討（未着手）: `gradio_app.py` の既定は `IRODORI_OPT_ANE_SHAPES=full` のままなので、M1 で環境変数を付けずに起動すると
-   安全弁が効くまでに 6 package 分の失敗コンパイル（各 12〜75 分）を初回に払う。チップ名（`sysctl machdep.cpu.brand_string`）
-   が Apple M1 なら `m1` を既定にする「auto」を入れるか、16 節 6 節の起動例（環境変数を明示）で運用するかは判断待ち。
+8. （済、09-22 夜、ユーザーが「auto」を選択）`opt_config.py` に `chip_name()` / `is_m1_chip()` /
+   `default_ane_shapes()` / `default_ane_gpu_branches()` を足し、`sysctl machdep.cpu.brand_string` が **無印 `Apple M1`
+   に完全一致**するときだけ shape セット `m1`・GPU 分岐 0 を既定にした。3 つの `gradio_app*.py` の `setdefault` も
+   この関数を使う。環境変数を明示すればそちらが勝つ。M1 Pro / Max / Ultra・M2 系は未測定なので M3 Pro の既定のまま
+   （`full` が載らなければ安全弁が効く）。実機確認: M3 Pro → `full` / 1、mini（Apple M1）→ `m1` / 0、環境変数なしの
+   short ベンチで `runner ready (m1, ne, 5 packages)`・`gpu_branches=0`・2630 ms（RTF 0.365）。
 
 ## 1. 目的 / 仮説
 

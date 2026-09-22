@@ -41,9 +41,10 @@ memory), the MPS backend, batch size 1. Every switch can be toggled through an
     IRODORI_OPT_ANE_GPU_COND=0     give the GPU the tail (uncond) branch instead of the cond branch
     IRODORI_OPT_ANE_NOCFG_GPU=1    run the no-CFG steps (t < cfg_min_t) on the GPU instead of the ANE
     IRODORI_OPT_ANE_CANDIDATES=0   with num_candidates=2, do not split candidate 0 -> ANE, 1 -> GPU
-    IRODORI_OPT_ANE_SHAPES=dev|full|m1 enumerated shape set (default full; dev: 3 latent buckets x
-                                   batch 1-3, full: 23 buckets x 2 context profiles, m1: the set
-                                   that loads on an M1's ANE, 17-m1-ane-factors.md; first build is minutes)
+    IRODORI_OPT_ANE_SHAPES=dev|full|m1 enumerated shape set (default full, or m1 on an Apple M1 chip;
+                                   dev: 3 latent buckets x batch 1-3, full: 23 buckets x 2 context
+                                   profiles, m1: the set that loads on an M1's ANE,
+                                   17-m1-ane-factors.md; first build is minutes to an hour)
     IRODORI_OPT_ANE_UNITS=ne|all|gpu|cpu  Core ML compute units for the worker (default ne)
     IRODORI_OPT_ANE_LOG=0          silence the [ane] load / per-request lines
     IRODORI_OPT_ANE_CACHE_DIR=path where exported/compiled Core ML packages live
@@ -55,7 +56,50 @@ The values are read once at first access.
 from __future__ import annotations
 
 import os
+import platform
+import subprocess
 from dataclasses import dataclass, fields
+from functools import lru_cache
+
+# Chips whose ANE defaults differ from the M3 Pro's. Exact match only: the M1 Pro / Max / Ultra and
+# the M2 family are unmeasured, so they keep the M3 Pro defaults and get the compile-failure valve
+# (ane_dit.ensure_packages) if `full` does not load.
+ANE_M1_CHIPS = ("Apple M1",)
+
+
+@lru_cache(maxsize=1)
+def chip_name() -> str:
+    """`sysctl machdep.cpu.brand_string` (e.g. "Apple M1"), "" when unavailable."""
+    if platform.system() != "Darwin":
+        return ""
+    try:
+        out = subprocess.run(
+            ["/usr/sbin/sysctl", "-n", "machdep.cpu.brand_string"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return out.stdout.strip()
+
+
+def is_m1_chip() -> bool:
+    return chip_name() in ANE_M1_CHIPS
+
+
+def default_ane_shapes() -> str:
+    """Shape set when IRODORI_OPT_ANE_SHAPES is unset: `full` fails to compile on the M1's ANE
+    (6 packages x 12-75 min, then CPU execution; 16-m1-mini.md 5) and `m1` is the measured set that
+    loads there (17-m1-ane-factors.md 4-4)."""
+    return "m1" if is_m1_chip() else "full"
+
+
+def default_ane_gpu_branches() -> int:
+    """GPU CFG branches for the Gradio apps when IRODORI_OPT_ANE_GPU_BRANCHES is unset: 1 on the
+    M3 Pro (13-ane.md), 0 on the M1 where the GPU becomes the straggler (16-m1-mini.md 4-4)."""
+    return 0 if is_m1_chip() else 1
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -150,7 +194,9 @@ class OptConfig:
             ane_gpu_cond=_env_bool("IRODORI_OPT_ANE_GPU_COND", True),
             ane_nocfg_gpu=_env_bool("IRODORI_OPT_ANE_NOCFG_GPU", False),
             ane_candidates=_env_bool("IRODORI_OPT_ANE_CANDIDATES", True),
-            ane_shapes=_env_str("IRODORI_OPT_ANE_SHAPES", "full", ("dev", "full", "m1")),
+            ane_shapes=_env_str(
+                "IRODORI_OPT_ANE_SHAPES", default_ane_shapes(), ("dev", "full", "m1")
+            ),
             ane_units=_env_str("IRODORI_OPT_ANE_UNITS", "ne", ("ne", "all", "gpu", "cpu")),
             ane_log=_env_bool("IRODORI_OPT_ANE_LOG", True),
         )

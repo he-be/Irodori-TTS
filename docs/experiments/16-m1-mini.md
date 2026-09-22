@@ -348,16 +348,14 @@ package 間で重みが共有されない場合）。コンパイル失敗との
    ビルド済みキャッシュは `~/.cache/irodori-tts/ane` にあるが、**M3 Pro で焼いたものを配れるかは未確認**。
    OS 側のコンパイルは各機で走る。
 
-推奨の起動環境変数（M1 mini、現時点）:
+推奨の起動（M1 mini、09-22 以降）: **環境変数なしで `uv run --no-sync python gradio_app.py` でよい。**
+`opt_config.py` がチップ名（`sysctl machdep.cpu.brand_string`）を見て、無印 Apple M1 なら shape セット `m1` と
+GPU 分岐 0 を既定にする（17 節 0-5 の 8。環境変数を明示すればそちらが勝つ。M1 Pro / Max / Ultra と M2 系は未測定なので
+M3 Pro の既定のまま）。実機確認（09-22 19:2x、環境変数なし、short）: `runner ready (m1, ne, 5 packages)`、
+`gpu_branches=0`、2630 ms（RTF 0.365）。
 
-```sh
-IRODORI_OPT_ANE=1 IRODORI_OPT_ANE_SHAPES=dev IRODORI_OPT_ANE_GPU_BRANCHES=0 \
-IRODORI_OPT_COMPILE_DIT=1 IRODORI_OPT_COMPILE_CODEC=1 \
-  uv run --no-sync python gradio_app.py     # 2 ワーカー並べるとスループットは約 2 倍
-```
-
-`dev` は bucket が 3 つしかないので、latent がその間に来る原稿ではパディング分だけ損をする。
-bucket を増やせる上限が分かるまでは、これが M1 で確実に ANE に載る唯一のセットである（実測）。
+09-22 昼までの推奨だった `IRODORI_OPT_ANE_SHAPES=dev` は bucket が 3 つしかなく、150 字超の本文が MPS に落ちる。
+`m1`（5 package、初回ビルド約 57 分、17 節 4-4）が上位互換。「2 ワーカーでスループット 2 倍」は誤りだった（4-7 の訂正）。
 
 ## 7. 測定環境で見つけた問題（本題ではないが実測）
 

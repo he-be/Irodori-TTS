@@ -10,10 +10,14 @@ _os.environ.setdefault("IRODORI_OPT_COMPILE_DIT", "1")
 _os.environ.setdefault("IRODORI_OPT_COMPILE_CODEC", "1")
 # RF step on the Neural Engine with the cond CFG branch on the GPU (13-ane.md). The first
 # start with an empty ~/.cache/irodori-tts/ane builds the Core ML packages (minutes);
-# `uv run python bench/build_ane.py --shapes full` does that ahead of time.
+# `uv run python bench/build_ane.py --shapes full` does that ahead of time. On an Apple M1 the
+# defaults become shapes=m1 / gpu_branches=0 (16-m1-mini.md, 17-m1-ane-factors.md); the
+# environment still wins.
+from irodori_tts.opt_config import default_ane_gpu_branches, default_ane_shapes
+
 _os.environ.setdefault("IRODORI_OPT_ANE", "1")
-_os.environ.setdefault("IRODORI_OPT_ANE_GPU_BRANCHES", "1")
-_os.environ.setdefault("IRODORI_OPT_ANE_SHAPES", "full")
+_os.environ.setdefault("IRODORI_OPT_ANE_GPU_BRANCHES", str(default_ane_gpu_branches()))
+_os.environ.setdefault("IRODORI_OPT_ANE_SHAPES", default_ane_shapes())
 
 import argparse
 import time
