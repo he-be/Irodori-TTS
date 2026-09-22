@@ -360,8 +360,10 @@ MBP など別の機械から使う（実測、09-22 夜）: mini で `--server-n
 
 ```sh
 ssh mh@mhnoMac-mini.local
-cd ~/dev/Irodori-TTS && nohup uv run --no-sync python gradio_app.py --server-name 0.0.0.0 > ~/gradio.log 2>&1 &
+cd ~/dev/Irodori-TTS && nohup ~/.local/bin/uv run --no-sync python gradio_app.py --server-name 0.0.0.0 > ~/gradio.log 2>&1 &
 ```
+
+mini の対話シェルでは `uv` が PATH に無い（exit 127）ので `~/.local/bin/uv` をフルパスで書く。
 
 09-22 昼までの推奨だった `IRODORI_OPT_ANE_SHAPES=dev` は bucket が 3 つしかなく、150 字超の本文が MPS に落ちる。
 `m1`（5 package、初回ビルド約 57 分、17 節 4-4）が上位互換。「2 ワーカーでスループット 2 倍」は誤りだった（4-7 の訂正）。
