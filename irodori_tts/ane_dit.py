@@ -104,7 +104,9 @@ S_BUCKETS_DEV = (192, 320, 768)
 # a limit on the number of enumerated shapes at 12 layers: batch 3 loads 6 and fails 9, batch 2
 # loads 6 (590 s) and fails 18 (the same register-spiller failure, reached after 74 min of
 # compiling; 17-m1-ane-factors.md 2-2). The 6-bucket list is the largest enumeration measured to load.
-S_BUCKETS_M1 = tuple(s for s in S_BUCKETS_FULL if s >= 192)
+# Batch 1 loads 18 buckets up to 1536, but a request is capped at max_seconds=30 (750 frames), so
+# the set stops at 768: 12 buckets, ANE compile 330 s instead of 715 s (17-m1-ane-factors.md 0-2).
+S_BUCKETS_M1 = tuple(s for s in S_BUCKETS_FULL if 192 <= s <= 768)
 S_BUCKETS_M1_B23 = (192, 256, 320, 448, 576, 768)
 BATCHES = (1, 2, 3)
 # Largest latent bucket per batch size. A batch-3 package enumerated up to 1536 frames takes
@@ -133,14 +135,15 @@ def shape_packages(name: str) -> dict[str, list[Shape]]:
     elif name == "full":
         buckets, profiles = S_BUCKETS_FULL, ("a", "b")
     elif name == "m1":
-        # Measured to load on the M1 (17-m1-ane-factors.md 2-2): profile a and b at batch 1 with
-        # 18 buckets, profile a at batch 2 and 3 with 6. Profile b at batch 2 / 3 is unmeasured,
-        # so those requests take MPS.
+        # Measured to load on the M1 (17-m1-ane-factors.md 2-2 / 0-2): profile a and b at batch 1
+        # with 12 buckets, profile a at batch 2 and profile a / b at batch 3 with 6. Profile b at
+        # batch 2 is unmeasured, so those requests take MPS.
         return {
             package_key("a", 1): _shapes_for(1, PROFILES["a"], S_BUCKETS_M1),
             package_key("b", 1): _shapes_for(1, PROFILES["b"], S_BUCKETS_M1),
             package_key("a", 2): _shapes_for(2, PROFILES["a"], S_BUCKETS_M1_B23),
             package_key("a", 3): _shapes_for(3, PROFILES["a"], S_BUCKETS_M1_B23),
+            package_key("b", 3): _shapes_for(3, PROFILES["b"], S_BUCKETS_M1_B23),
         }
     else:
         raise ValueError(f"unknown ANE shape set {name!r} (expected dev|full|m1)")
