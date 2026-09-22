@@ -350,7 +350,7 @@ package 間で重みが共有されない場合）。コンパイル失敗との
 
 推奨の起動（M1 mini、09-22 以降）: **環境変数なしで `uv run --no-sync python gradio_app.py` でよい。**
 `opt_config.py` がチップ名（`sysctl machdep.cpu.brand_string`）を見て、無印 Apple M1 なら shape セット `m1` と
-GPU 分岐 0 を既定にする（17 節 0-5 の 8。環境変数を明示すればそちらが勝つ。M1 Pro / Max / Ultra と M2 系は未測定なので
+GPU 分岐 0 を既定にする（17 節 3-2。環境変数を明示すればそちらが勝つ。M1 Pro / Max / Ultra と M2 系は未測定なので
 M3 Pro の既定のまま）。実機確認（09-22 19:2x、環境変数なし、short）: `runner ready (m1, ne, 5 packages)`、
 `gpu_branches=0`、2630 ms（RTF 0.365）。
 

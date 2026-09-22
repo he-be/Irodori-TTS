@@ -105,7 +105,7 @@ S_BUCKETS_DEV = (192, 320, 768)
 # loads 6 (590 s) and fails 18 (the same register-spiller failure, reached after 74 min of
 # compiling; 17-m1-ane-factors.md 2-2). The 6-bucket list is the largest enumeration measured to load.
 # Batch 1 loads 18 buckets up to 1536, but a request is capped at max_seconds=30 (750 frames), so
-# the set stops at 768: 12 buckets, ANE compile 330 s instead of 715 s (17-m1-ane-factors.md 0-2).
+# the set stops at 768: 12 buckets, ANE compile 330 s instead of 715 s (17-m1-ane-factors.md 2-2).
 S_BUCKETS_M1 = tuple(s for s in S_BUCKETS_FULL if 192 <= s <= 768)
 S_BUCKETS_M1_B23 = (192, 256, 320, 448, 576, 768)
 BATCHES = (1, 2, 3)

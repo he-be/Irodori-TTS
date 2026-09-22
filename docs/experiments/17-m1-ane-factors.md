@@ -1,157 +1,16 @@
-# 17. M1 の ANE コンパイル失敗を要因に分ける（作業中・引き継ぎメモ付き）
+# 17. M1 の ANE コンパイル失敗を要因に分ける
 
-作成: 2026-09-22（ブランチ `metal-local`、16 の続き）。**未完**。この文書の 0 節は次のセッションへの引き継ぎで、
-完了時に消して 1 節以降を正式な実験記録に整える。
+作成: 2026-09-22（ブランチ `metal-local`、16 の続き）。同日夜に完了。測定は M1 Mac mini（16 GB、macOS 27.0、
+coremltools 9.0）、比較用に M3 Pro を 2 本。道具と手順は 6 節。
 
 **実測** = 数字を取ったもの。**導出** = 実測からの計算。**未確認** = 根拠なし。
-
-## 0. 引き継ぎ（2026-09-22 夕、set6 を mini に投入した直後）
-
-### 0-1. 新しいセッションで最初にやること
-
-```bash
-# 1) mini のジョブ状況（nohup なので MBP の再起動とは無関係に走り続けている）
-ssh mh@mhnoMac-mini.local 'for s in set2 set3; do echo "== $s"; cut -c1-235 ~/probe_logs/${s}_summary.txt; done;
-  pgrep -fl "probe_ane_shapes.py --tag" | head -1; ps -axo pcpu,etime,comm | grep ANECompilerService | grep -v grep'
-# 2) 結果 JSON を手元に回収して一覧
-rsync -a mh@mhnoMac-mini.local:dev/Irodori-TTS/docs/experiments/results/ane_probe/ docs/experiments/results/ane_probe/
-ssh mh@mhnoMac-mini.local 'cd ~/dev/Irodori-TTS/docs/experiments/results/ane_probe && python3 ~/probe_logs/tab.py'
-```
-
-`*_summary.txt` の末尾に `DONE` があればそのセットは完了。**現在走っているのは set6**（0-2 末尾）。
-
-### 0-2. mini で走らせたもの（set2 / set3 とも完了、09-22 昼）
-
-`set2_summary.txt` / `set3_summary.txt` とも末尾 `DONE`。4 本の結果は 2-2 の表と 2-5 に反映済み。
-
-| セット | 本 | 内容 | 判定 |
-|---|---|---|---|
-| set2 | `m1_b3_ge192x12_12blk` | **12 層** × batch 3 × 12 形（192〜768）| **失敗**（spiller）|
-| set3-1 | `m1_b1_le768x17_2blk_dlast` | 2 ブロック × batch 1 × 17 形（32〜768）、**default = 最大形** | **失敗**（spiller）|
-| set3-2 | `m1_b3_dev3_2blk_skipload` | 2 ブロック × batch 3 × dev 3 形、`skip_model_load=True` | 載る |
-| set3-3 | `m1_b1_full23_2blk_dlast` | 2 ブロック × batch 1 × 23 形、default = 最大形 + skip_model_load | **失敗**（spiller）|
-
-`m1_b3_ge192x12_12blk` は 1961 s で自力で失敗し `--timeout 3000` に届かなかった。timeout kill 経路は set4 の 1 本目で
-試験済み（下表、0-4）。
-
-**set4**（09-22 昼に投入、`~/probe_logs/set4.txt`、全部 `--skip-model-load`、2 本目以降は 12 層）:
-
-| 順 | 本 | 内容 | 目的 | 判定 |
-|---|---|---|---|---|
-| 1 | `m1_b1_le768x17_2blk_tmo20` | 既知の失敗形（2 blk × b1 × 17 形）を `--timeout 20` で | timeout kill 経路の試験 | **kill 成功**（0-4）|
-| 2 | `m1_b3_mid6_12blk` | b3 × 6 形（192,256,320,448,576,768）| b3 の列挙数二分の中点（3 載る / 12 落ちる）| **載る**（1006 s、再ロード 0.14 s、L2 ミス 4）|
-| 3 | `m1_b2_ge192x18_12blk` | b2 × 18 形（192〜1536）| batch 2（2 候補生成）は M1 で未測定 | **timeout**（3000 s、失敗ログなし、L2 ミス 6。kill 成功）|
-| 4 | `m1_pb_b1_ge192x18_12blk` | profile b × b1 × 18 形 | profile b は M1 で未測定 | **載る**（722 s、再ロード 0.28 s、L2 ミス 7）|
-| 5 | `m1_b3_q4_12blk` | b3 × 4 形（192,320,512,768）| 2 が落ちた場合の次点 | **載る**（658 s、再ロード 0.13 s、L2 ミス 2）|
-| 6 | `m1_b3_n9_12blk` | b3 × 9 形（192〜768）| 2 が載った場合の次点 | **失敗**（spiller、1220 s、再ロードも 1215 s）|
-
-5 と 6 は片方が冗長になるが、無人で回すので両方入れて b3 の列挙数 3 / 4 / 6 / 9 / 12 の全点を取る。
-
-**set5**（set4 → after_set4 の `DONE` を待って自動開始、`~/probe_logs/set5.txt`、batch 2 だけ）:
-
-| 順 | 本 | 内容 | 目的 |
-|---|---|---|---|
-| 1 | `m1_b2_mid6_12blk` | b2 × 6 形（192,256,320,448,576,768）| b3 で載った列挙をそのまま b2 で | **載る**（590 s、再ロード 0.14 s、L2 ミス 3）|
-| 2 | `m1_b2_ge192x18_12blk_t7200` | b2 × 18 形（192〜1536）、`--timeout 7200` | 3000 s の打ち切りが「遅いだけ」か「終わらない」か | **失敗**（spiller、統合ログ 15:08:06 = 開始から約 4400 s。再ロードも同じ失敗をやり直し）|
-
-**set5 の後に自動で走るもの**（`~/probe_logs/after_set5.sh`、結果は `after_set5_summary.txt`、最後に `DONE`）:
-`bench_runtime.py` で (1) short 単独（`m1_conc_m1set_solo`）、(2) short を 2 プロセス同時（`m1_conc_m1set_a` / `_b`、
-16 節 4-7 と同じ repeats 5 / cooldown 0。2 × 3 package = 重み 4 GB が ANE アドレス空間 3.5 GiB を超えるかの試験）、
-(3) 新設入力 `xlong`（long の本文を約 2 倍に延ばしたもの、latent 約 1440 の見込み）を `m1`（`m1_xlong_m1set`）と
-`dev`（`m1_xlong_devset`、768 超は MPS 落ち）で。`bench/bench_runtime.py` に `xlong` を足して scp 済み。
-
-**set6**（09-22 16:54 投入、`~/probe_logs/set6.txt`、全部 12 層 + `--skip-model-load`。前提: 「最長 30 s で十分」と
-ユーザーが決めた（09-22）→ latent は 750 で頭打ち、bucket は 768 までしか使われない）:
-
-| 順 | 本 | 内容 | 目的 | 判定 |
-|---|---|---|---|---|
-| 1 | `m1_pb_b3_mid6_12blk` | profile b × b3 × 6 形（192〜768）| 長い本文（64 トークン超）× CFG を ANE に載せる（4-3 の穴）| **載る**（1014 s、再ロード 0.14 s、L2 ミス 4）|
-| 2 | `m1_b1_le768x12_12blk` | profile a × b1 × 12 形（192〜768）| 30 s 上限で使われない 896〜1536 を外す（ビルド短縮、4-2 の 3〜5% の解消）| **載る**（330 s、再ロード 0.19 s、L2 ミス 4）|
-| 3 | `m1_pb_b1_le768x12_12blk` | profile b × b1 × 12 形（192〜768）| 同上 | **載る**（332 s、再ロード 0.19 s、L2 ミス 4）|
-
-3 本とも載った（17:26 完了）ので `shape_packages("m1")` を a_b1 / b_b1 × 12 形 + a_b2 / a_b3 / b_b3 × 6 形（5 package）に
-書き換え（手元で編集、mini に scp 済み）、`~/probe_logs/after_set6.sh` を 17:27 に投入した: `build_ane.py --shapes m1`
-（新規 3 package のコンパイル）→ `bench_runtime.py` 5 入力（4 入力 + `xlong`、出力 `results/m1_ane_m1v2_sway12_compile.json`）→
-`bench_longform.py --tag m1_longform_ane_m1v2`。結果は `~/probe_logs/after_set6_summary.txt`、最後に `DONE`。
-結果は 4-4（xlong は ANE に載り、RTF 0.634 → 0.511）。
-
-**set4 の後に自動で走るもの（済、4 節）**（`~/probe_logs/after_set4.sh`、`set4_summary.txt` の `DONE` を待って開始、
-結果は `~/probe_logs/after_set4_summary.txt` に 1 行ずつ、最後に `DONE`）:
-`bench/build_ane.py --shapes m1`（3 package を 1 ワーカーで preload = 同時ロード 2 GB の試験、0-5 の 3）→
-`bench_runtime.py` 4 入力（16 節 3 節と同じ引数、`IRODORI_OPT_ANE_SHAPES=m1`、出力
-`results/m1_ane_m1set_sway12_compile.json`）→ `bench_longform.py --tag m1_longform_ane_m1set`。
-ログは `~/probe_logs/build_m1.log` / `bench_m1.log` / `longform_m1.log`。この時点の `m1` は **a_b1 × 18 形 + b_b1 × 18 形 +
-a_b3 × 6 形**（b2 なし、b_b3 なし）。3 package の同時ロードは重み 2.0 GB（導出）。set5-1 の後に a_b2 × 6 形を足した
-（4 package。after_set5 のベンチは 1 候補なので a_b2 はロードされない）。
-mini には手元の `ane_dit.py` / `ane_worker.py` / `opt_config.py` / `build_ane.py` / `check_ane.py` を scp 済み。
-所要は合計 2.5〜3 時間の見込み（導出）。`run_list.sh` は `--timeout 3000 --kill-stale` を**引数の前**に置くように直した
-（行ごとの `--timeout` で上書きできる。argparse は後勝ち）。リストは**絶対パス**で渡す（スクリプト内で cd するため）。
-
-mini 側の道具: `~/probe_logs/run_list.sh <list.txt>`（1 行 = `tag|プローブ引数`、順に実行して `<list>_summary.txt` に 1 行ずつ、
-最後に `DONE`）、`~/probe_logs/tab.py`（結果 JSON の一覧表）、各本のログは `~/probe_logs/<tag>.log`。
-mini の repo には `bench/probe_ane_shapes.py`（未追跡）と `irodori_tts/ane_dit.py`（変更あり）を **scp で置いてある**。
-手元で直したら再度 scp すること（mini では commit / pull していない）。環境変数は `HF_HUB_DISABLE_XET=1 HF_HUB_OFFLINE=1`。
-
-### 0-3. 手元（M3 Pro）の未コミットの変更
-
-- `bench/probe_ane_shapes.py`（新規）— 1 回 = 1 候補 package。変換 → compile_model → 子プロセスでロード（= ANE コンパイル）
-  → 再ロード → **統合ログで判定**（`ane_ok / compile_failed / timeout`）。`--blocks N` で先頭 N ブロックの代理モデル、
-  `--default-index`、`--skip-model-load`、`--ctx-pad-start`、`--cpu-ref`、`--kill-stale`。
-  結果は `docs/experiments/results/ane_probe/<tag>.json`。
-- `irodori_tts/ane_dit.py` — `export_package()` に `default_index` / `skip_model_load` 引数。**`skip_model_load` の既定を
-  `True` にした**（2-5）。加えて安全弁（3 節）: `ensure_packages()` は `<stem>.ane_failed.json` マーカーのある package を
-  外す（OS 版が同じ場合のみ）、`AneStepRunner._after_load()` がワーカーの `ane_failed` を受けて package を外し
-  マーカーを書く、`make_context()` はその場合 None を返す（呼び出し側は既に MPS に戻る実装）。
-  **ruff format をこのファイルにかけないこと**（既存コードが大量に整形されて差分が汚れる。一度やって戻した）。
-- `irodori_tts/ane_worker.py` — `_load()` がロード後（2 秒超のとき = コンパイルが走ったとき）に統合ログ（`process == "aned"`）を
-  見て `Model load failed` / `Compilation failed` があればモデルを捨て `ane_failed` を返す（3 節）。
-- `docs/experiments/16-m1-mini.md` — 5-1 / 5-2 / 6-5 / 8 を統合ログの事実で訂正済み。**ただし 5-2 の
-  「13 節 5-1 と同じ署名」は、その後の実測で誤りと分かった**（2-3）。16 節の再訂正が残っている。
-- `docs/experiments/results/m1_ane_compiler_log_20260921.txt` — 09-21 夜の `full` ビルドの aned / ANECompilerService ログ。
-- `docs/experiments/results/ane_probe/*.json` — ここまでのプローブ結果（M1 13 本 + M3 Pro 2 本）。
-- 上記はすべて 5e0b2f8 でコミット済み（09-22 16:50）。`docs/note-mac.md` はこの作業と無関係の未追跡ファイル。
-
-### 0-4. mini の sudo
-
-`/etc/sudoers.d/ane-kill` に `mh ALL=(root) NOPASSWD: /usr/bin/pkill -9 -x ANECompilerService` を設置済み（ユーザーが実施）。
-`ssh mh@mhnoMac-mini.local 'sudo -n /usr/bin/pkill -9 -x ANECompilerService'` が通る（exit 1 = 対象なし）。
-引数まで完全一致でしか通らない。**実測（set4-1）**: 20 秒で子プロセスを打ち切り → `pkill_rc` 0 → ANECompilerService は
-2 秒後も 22 秒後も不在、次のジョブは新しい ANECompilerService で始まった。root の SIGKILL で止まり、aned は勝手に再開しない。
-統合ログは sudo 不要: `/usr/bin/log show --predicate 'process == "ANECompilerService" OR process == "aned"'`
-（zsh では `log` が builtin なのでフルパス必須）。
-
-### 0-5. 次にやること（順に）
-
-1. （済）set2 / set3 の結果を 2 節に反映した。分岐の結果は 2-2 / 2-5 のとおり。
-   - batch 1 の 192 未満の下限探索は**やらない**（short 入力 latent 180 は 192 に丸まるだけで損が小さく、2 ブロック代理が
-     使えないので 12 層で数本要る。費用対効果が低い）。
-   - （済）batch 3 の列挙数: 6 形は載り 9 形は落ちた → `S_BUCKETS_M1_B3` は 6 形で確定（7 / 8 形は未測定、価値が低い）。
-   - （済）`export_package` の既定を `skip_model_load=True` にした。
-2. （済）M1 用の shape セット `m1` を `ane_dit.shape_packages()` に足した: a_b1 / b_b1 = 192〜1536 の 18 形、
-   a_b2 / a_b3 = 192〜768 の 6 形（`S_BUCKETS_M1_B23`）、b_b2 / b_b3 なし（未測定。長リファレンス × 2 候補 / CFG 3 分岐は MPS）。`opt_config.py` と `bench/build_ane.py` / `check_ane.py` の choices にも `m1` を足した。
-3. （済）`m1` の 3 package を 12 層でビルド: 変換 3 × 30 s（`skip_model_load` 既定化後）、ワーカーでの ANE コンパイル
-   a_b1 712 s / b_b1 721 s / a_b3 995 s、合計 2564 s（43 分）。**3 package（重み 2.0 GB）の同時ロードは失敗なし**
-   （`ane_failed` なし、実測 12:53〜13:36）。2 ワーカー時（4 GB > 3.5 GiB）は after_set5 で自動測定。
-4. （済、4 節）e2e と長文を `m1` セットで再測 → dev と同速。「細かい bucket で速くなる」は成り立たなかった（4 入力は同じ
-   bucket に丸まる。長文はセグメントごとに相殺）。`m1` の利点は守備範囲（batch 1 の 768 超、profile b）で、
-   768 超は after_set5 の `xlong` で測る。
-5. （済、3 節）安全弁。
-6. （16 節の再訂正は済）メモリ `m1-mini-tts-server.md` の更新、コミット。
-7. （済、0-2 の set6 と 4-4）b_b3 × 6 形と b1 / b_b1 の 768 までの 12 形が載り、`m1` を 5 package に書き換えて再測した。
-   (a) 再起動後の 2 ワーカー再測も済（4-2-1）: 16 節 4-7 の 1.97× は測定窓のずれで、実際は 1.14×。
-8. （済、09-22 夜、ユーザーが「auto」を選択）`opt_config.py` に `chip_name()` / `is_m1_chip()` /
-   `default_ane_shapes()` / `default_ane_gpu_branches()` を足し、`sysctl machdep.cpu.brand_string` が **無印 `Apple M1`
-   に完全一致**するときだけ shape セット `m1`・GPU 分岐 0 を既定にした。3 つの `gradio_app*.py` の `setdefault` も
-   この関数を使う。環境変数を明示すればそちらが勝つ。M1 Pro / Max / Ultra・M2 系は未測定なので M3 Pro の既定のまま
-   （`full` が載らなければ安全弁が効く）。実機確認: M3 Pro → `full` / 1、mini（Apple M1）→ `m1` / 0、環境変数なしの
-   short ベンチで `runner ready (m1, ne, 5 packages)`・`gpu_branches=0`・2630 ms（RTF 0.365）。
 
 ## 1. 目的 / 仮説
 
 16 節は「`full` shape セットは M1 の ANE に載らない」「OS のコンパイルキャッシュが容量で追い出される」と結論したが、
 複数の要因（列挙数 / 最大形 / ctx / 層数 / OS 版 / 背景負荷）を混ぜたまま「M1 だから」に帰していた。要因を 1 つずつ測る。
 
-## 2. ここまでの結果
+## 2. 要因の切り分け
 
 ### 2-1. 16 節の `full` は ANE コンパイルに失敗していた（実測、統合ログ）
 
@@ -222,6 +81,8 @@ profile b では 49 / 228 ms（18 形 package の 1×192 = 49 ms と同じ。列
 - **profile b（ctx 256/256/64）は batch 1 なら 18 形が 12 層で載る**（実測、722 s。profile a の 715 s と同じ）。ctx の幅は
   障害ではない。profile b × batch 3 は未測定。
 - 実用上は今の時点で、**192 未満の bucket を外せば M1 でも batch 1 は 1536 まで 12 層で載る**（実測）。
+  192 未満の下限探索はやらない: short 入力（latent 180）が 192 に丸まる損は小さく、2 ブロック代理が使えない（下記）ので
+  12 層で数本要る。費用対効果が低い。batch 3 の 7 / 8 形も同じ理由で未測定。
 - 2 ブロック代理は 12 層の完全な代理ではない（b3 × 17 形は 12 層で失敗、2 ブロックで成功）。最終確認は必ず 12 層で。
 
 ### 2-3. M3 Pro の B=3 × 1536 は別の機序（実測、`m3_b3_full23_12blk`）
@@ -234,7 +95,9 @@ profile b では 49 / 228 ms（18 形 package の 1×192 = 49 ms と同じ。列
 ### 2-4. ANE のアドレス空間（実測、`ioreg -c AppleARMIODevice -r -w0 | grep -A 25 dart-ane`）
 
 M1: `dart,t8020`、`vm-size` = 0xe0000000 = **3.5 GiB**。M3 Pro: `dart,t8110`、48 bit 級。
-package 1 個の重みは 0.68 GB。6 package 同時ロード（4.1 GB）が M1 で成立するかは**未確認**（0-5 の 3）。
+package 1 個の重みは 0.68 GB。1 ワーカーでの同時ロードは 3 package（2.0 GB、4-0）も 5 package（3.4 GB、4-4）も成立した
+（実測、`ane_failed` なし）。6 package（4.1 GB）は**未確認**。2 ワーカー × 5 package（6.8 GB）でも失敗ログは出ていない
+（4-2-1）が、アドレス空間はプロセスごとの可能性があり、超えたときに何が起きるかは**未確認**。
 
 ### 2-5. 「変換 93 分」の正体（実測 + 推定）
 
@@ -293,9 +156,27 @@ b3 × 23 形（〜1536）× 12 層を `AneStepRunner(cache_dir=<空ディレク�
 フィルタ前の shape セットからサイズを取るように直した（package 0 個でも runner は立ち、全要求が MPS に行く）。
 M1 で `full` を指定した場合の挙動は**未実測**だが同じ経路（初回だけ 12〜75 分の失敗コンパイルを払い、以後はスキップ）。
 
-## 4. `m1` セットでの e2e（実測、M1 mini、09-22 13:38、16 節 3 節と同じ引数、`IRODORI_OPT_ANE_SHAPES=m1`）
+### 3-2. M1 では既定を自動で切り替える（実装、09-22 夜）
 
-`m1` = a_b1 × 18 形（192〜1536）+ b_b1 × 18 形 + a_b3 × 6 形（192,256,320,448,576,768）。ANE 全分岐 + compile。
+`gradio_app*.py` の既定は M3 Pro 向け（shape セット `full`、GPU 分岐 1）で、M1 で環境変数なしに起動すると安全弁が効くまでの
+初回に 6 package 分の失敗コンパイル（各 12〜75 分）を払い、GPU 分岐 1 は M1 では逆効果（16 節 4-4）。運用で環境変数を
+付け続けるか、コードで切り替えるかをユーザーに諮り、**チップ名で切り替える**ことになった。
+
+- `opt_config.py`: `chip_name()`（`sysctl machdep.cpu.brand_string`、1 回だけ）、`is_m1_chip()`（**無印 `Apple M1` に
+  完全一致**のみ）、`default_ane_shapes()`（M1 なら `m1`、他は `full`）、`default_ane_gpu_branches()`（M1 なら 0、他は 1）。
+  `OptConfig.from_env()` の `ane_shapes` の既定と、3 つの `gradio_app*.py` の `setdefault` がこれを使う。環境変数を明示すれば
+  そちらが勝つ。
+- M1 Pro / Max / Ultra と M2 系は未測定なので M3 Pro の既定のまま（`full` が載らなければ 3 節の安全弁が効く）。
+- 実機確認（実測）: M3 Pro → `full` / 1、mini（`Apple M1`）→ `m1` / 0。mini で環境変数なしの short ベンチ:
+  `runner ready (m1, ne, 5 packages)`、`gpu_branches=0`、2630 ms（RTF 0.365、4-2-1 の単独と同じ）。
+
+## 4. `m1` セットでの e2e と長文
+
+### 4-0. 第 1 版（実測、M1 mini、09-22 13:38、16 節 3 節と同じ引数、`IRODORI_OPT_ANE_SHAPES=m1`）
+
+`m1` 第 1 版 = a_b1 × 18 形（192〜1536）+ b_b1 × 18 形 + a_b3 × 6 形（192,256,320,448,576,768）。ANE 全分岐 + compile。
+ビルド（`build_ane.py --shapes m1`、12 層）: 変換 3 × 30 s、ワーカーでの ANE コンパイル a_b1 712 s / b_b1 721 s /
+a_b3 995 s、合計 2564 s（43 分）。3 package（重み 2.0 GB）の同時ロードは失敗なし（実測 12:53〜13:36）。
 4 入力とも `rf step on ANE + GPU`（ANE で走った、実測）。比較は 16 節 4-1 の「ANE 全分岐 + compile（dev）」。
 
 | 入力 | latent | bucket dev → m1 | dev（16 節）| `m1` | sample_rf dev → m1 |
@@ -305,8 +186,8 @@ M1 で `full` を指定した場合の挙動は**未実測**だが同じ経路�
 | long (28.84 s) | 721 | 768 → 768 | 13152 (0.456) | 13482 (0.467) | 7539 → 7852 |
 | caption_noref (7.32 s) | 183 | 192 → 192 | 2749 (0.376) | 2714 (0.371) | 1138 → 1130 |
 
-**差は無い（+1〜4%、測定ぶれの範囲か僅かに遅い）**。0-5 の 4 で「bucket が細かくなる分だけ速くなるはず（導出）」と
-書いたが、この 4 入力の latent 長（180 / 296 / 721 / 183）は dev の 3 bucket でも `m1` の 18 bucket でも**同じ bucket に
+**差は無い（+1〜4%、測定ぶれの範囲か僅かに遅い）**。着手時は「bucket が細かくなる分だけ速くなるはず（導出）」と
+見込んだが、この 4 入力の latent 長（180 / 296 / 721 / 183）は dev の 3 bucket でも `m1` の 18 bucket でも**同じ bucket に
 丸まる**ので、恩恵を受ける入力が 1 つも無い。細かい bucket の効果は bucket の間に落ちる長さ（例: latent 400 は dev で 768、
 `m1` で 448）でしか出ない。長文ベンチ（セグメント長がばらつく）で見る（4-1）。
 package が大きい（18 形）ことによる形あたりのペナルティは、ステップ単体（2-2: 3×192 が dev でも 6 形でも 102〜105 ms）
@@ -407,7 +288,7 @@ a_b1 330 s / b_b1 333 s / a_b2 595 s / a_b3 0.1 s（キャッシュ済み）/ b_
 焼くと a_b3 の 1006 s を足して約 57 分（導出）。5 package の同時ロード（重み 3.4 GB、導出）は失敗なし。
 ロード 5.7 s、warmup 47 s（3 package のときの 31 s から package 数分だけ増加）。
 
-| 入力 | latent | 経路 | 第 1 版（4 節）| 第 2 版 | sample_rf |
+| 入力 | latent | 経路 | 第 1 版（4-0）| 第 2 版 | sample_rf |
 |---|---:|---|---:|---:|---:|
 | short | 180 | ANE | 2736 ms (0.380) | 2720 ms (0.378) | 1173 → 1158 ms |
 | medium | 296 | ANE | 4528 (0.382) | 4484 (0.379) | 2104 → 2022 |
@@ -423,7 +304,7 @@ a_b1 330 s / b_b1 333 s / a_b2 595 s / a_b3 0.1 s（キャッシュ済み）/ b_
 - 長文（12 セグメント、107.1 s）: 通し 43.86 s（RTF 0.410）、最初の音まで 2.16 s、セグメント中央値 3646 ms。第 1 版の
   44.73 s（0.418）、dev の 44.30 s（0.414）と**同じ**。セグメントは全部 56 字以下なので profile a のままで、b_b3 は使われない。
 
-## 5. 結論（09-22 時点）
+## 5. 結論
 
 1. **16 節の「M1 の ANE には `full` が載らない」の実体**: (a) batch 1 は 192 未満の小さい bucket と大きい bucket を同じ
    package に入れると 2 層以上で spiller が落ちる（192 以上なら 1536 まで 18 形が載る）、(b) batch 3 は列挙数の上限が
@@ -436,8 +317,52 @@ a_b1 330 s / b_b1 333 s / a_b2 595 s / a_b3 0.1 s（キャッシュ済み）/ b_
    (b) 2 候補生成（a_b2）、(c) 長いリファレンス × CFG なし（b_b1）。b_b2（長い本文 × 2 候補）だけが未測定で MPS 落ち。
 3. **安全弁**（3 節）で、載らない package は初回の失敗コンパイル 1 回だけ払って以後 MPS に固定される。
    黙って CPU で 9 倍遅くなる（2-2 の 933 ms/step）ことは無くなった。
-4. M1 での推奨: 短い本文（150 字以内）だけなら `dev`（ビルド 35 分、16 節）で足りる。150 字を超える本文を 1 リクエストで
-   投げるなら `m1`（5 package、約 57 分）。`full` は指定しないこと（6 package × 12〜75 分の失敗コンパイルを初回に払う）。
+4. M1 での推奨は `m1`（5 package、初回ビルド約 57 分）。短い本文（150 字以内）だけなら `dev`（ビルド 35 分、16 節）でも
+   足りる。`full` は指定しないこと（6 package × 12〜75 分の失敗コンパイルを初回に払う）。
 5. **16 節 4-7 の「2 ワーカーでスループット 2 倍」は誤り**（4-2-1）。再起動直後でも dev で各リクエスト 1.7〜1.8 倍遅く、
    スループットは 1.14×（MPS のみの 1.12× と同じ）。09-21 の値は 2 プロセスの測定窓が重なっていなかった（a の長い warmup
    の間に b が走り終えていた）。M1 で ANE を使う理由は単独のレイテンシ（RTF 0.37〜0.47）であって、並列スループットではない。
+6. **M1 では環境変数なしで正しい構成になる**（3-2）: チップ名が無印 Apple M1 なら `m1` / GPU 分岐 0 が既定。
+   16 節 6 節の起動例は不要になった。
+
+## 6. 道具と手順（M1 mini）
+
+### 6-1. プローブ `bench/probe_ane_shapes.py`
+
+1 回 = 1 候補 package。変換 → `compile_model` → 子プロセスでロード（= OS の ANE コンパイル）→ 再ロード → **統合ログで判定**
+（`ane_ok` / `compile_failed` / `timeout`。速度では判定しない）。`--blocks N` で先頭 N ブロックの代理モデル（2 ブロックは
+12 層の完全な代理ではない、2-2）、`--default-index`、`--skip-model-load`、`--ctx-pad-start`、`--cpu-ref`、`--timeout`、
+`--kill-stale`。結果は `docs/experiments/results/ane_probe/<tag>.json`（ホスト、package 定義、前後の loadavg / swap /
+ANECompilerService の有無、変換秒、ロード秒、形ごとのステップ ms、ログの件数）。
+
+mini 側: `~/probe_logs/run_list.sh <絶対パス>.txt`（1 行 = `tag|プローブ引数`、順に実行して `<list>_summary.txt` に 1 行ずつ、
+最後に `DONE`。`--timeout 3000 --kill-stale` を引数の前に置くので行ごとの `--timeout` で上書きできる）、
+`~/probe_logs/tab.py`（結果 JSON の一覧）、各本のログは `~/probe_logs/<tag>.log`。`nohup` で投げて `DONE` を待つ。
+環境変数は `HF_HUB_DISABLE_XET=1 HF_HUB_OFFLINE=1`。mini の repo には手元のファイルを **scp で置いている**（commit / pull は
+していない）。
+
+### 6-2. ANECompilerService の打ち切り（sudo）
+
+`/etc/sudoers.d/ane-kill` に `mh ALL=(root) NOPASSWD: /usr/bin/pkill -9 -x ANECompilerService`（ユーザーが設置、引数まで
+完全一致でしか通らない）。`sudo -n /usr/bin/pkill -9 -x ANECompilerService`（exit 1 = 対象なし）。**実測**（set4-1、既知の
+失敗形を `--timeout 20` で）: 20 秒で子プロセスを打ち切り → pkill → ANECompilerService は 2 秒後も 22 秒後も不在、次のジョブは
+新しい ANECompilerService で始まった。root の SIGKILL で止まり、aned は勝手に再開しない。
+統合ログは sudo 不要: `/usr/bin/log show --predicate 'process == "ANECompilerService" OR process == "aned"'`
+（zsh では `log` が builtin なのでフルパス必須）。
+
+### 6-3. 実行順（09-22）
+
+| 時刻 | 何を | 結果の場所 |
+|---|---|---|
+| 〜昼 | set1〜3: 1 / 2 ブロック代理でのプローブ（列挙数・最大形・ctx・default index・`skip_model_load`）、12 層 × b3 × 12 形 | 2-2、2-5 |
+| 昼 | set4: timeout kill 試験、12 層 × b3 × 6 / 4 / 9 形、b2 × 18 形（timeout 3000）、profile b × b1 × 18 形 | 2-2、6-2 |
+| 12:53〜13:42 | after_set4: `m1` 第 1 版（3 package）のビルド → e2e 4 入力 → 長文 | 4-0、4-1 |
+| 〜15:08 | set5: b2 × 6 形、b2 × 18 形（timeout 7200） | 2-2 |
+| 16:34〜 | after_set5: 2 ワーカー、xlong（`m1` / dev） | 4-2、4-3 |
+| 16:54〜17:26 | set6: profile b × b3 × 6 形、b1 / profile b × b1 × 12 形（≤768） | 2-2 |
+| 17:27〜18:12 | after_set6: `m1` 第 2 版（5 package）のビルド → e2e 5 入力 → 長文 | 4-4 |
+| 19:01 再起動 → 19:05 | after_conc3: dev / `m1` の単独と 2 ワーカー | 4-2-1 |
+| 19:2x | 環境変数なしの short（auto 既定の確認） | 3-2 |
+
+set4 の b2 × 18 形（timeout 3000）は失敗に届く前に切っていただけで、set5 の 7200 で同じ失敗に届いた（2-2）。
+16 節 4-7 の 09-21 の 2 ワーカーは a / b の測定窓が重なっていなかった（4-2-1）。
