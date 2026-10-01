@@ -34,7 +34,8 @@ memory), the MPS backend, batch size 1. Every switch can be toggled through an
                                    the transformers import (default: overlapped)
     IRODORI_OPT_ROPE_REAL=0        use the complex-number RoPE instead of the real-valued one
     IRODORI_OPT_AUTO_STEPS=0       do not raise num_steps for long outputs (14-step-count.md)
-    IRODORI_OPT_ANE=1              run the RF step on the Neural Engine via Core ML (13-ane.md);
+    IRODORI_OPT_ANE=1              run the RF step on the Neural Engine via Core ML (13-ane.md;
+                                   the Gradio apps turn it on except on an Apple M6, 19-m6-mini.md);
                                    falls back to MPS per request when no enumerated shape fits
     IRODORI_OPT_ANE_GPU_BRANCHES=1 with ANE on and independent CFG, run this many CFG branches
                                    on the GPU concurrently with the ANE (0 = ANE only)
@@ -65,6 +66,9 @@ from functools import lru_cache
 # the M2 family are unmeasured, so they keep the M3 Pro defaults and get the compile-failure valve
 # (ane_dit.ensure_packages) if `full` does not load.
 ANE_M1_CHIPS = ("Apple M1",)
+# Chips where the Gradio apps leave the ANE off: the M6's GPU matmul units make the GPU-only path
+# the fastest, and only batch-1 step packages compile on its ANE (19-m6-mini.md).
+ANE_OFF_CHIPS = ("Apple M6",)
 
 
 @lru_cache(maxsize=1)
@@ -87,6 +91,12 @@ def chip_name() -> str:
 
 def is_m1_chip() -> bool:
     return chip_name() in ANE_M1_CHIPS
+
+
+def default_ane_enabled() -> bool:
+    """Whether the Gradio apps turn the ANE on when IRODORI_OPT_ANE is unset: off on the M6, where
+    GPU-only is 1.42x the M3 Pro's best and batch 2/3 packages fail ANE compilation (19-m6-mini.md)."""
+    return chip_name() not in ANE_OFF_CHIPS
 
 
 def default_ane_shapes() -> str:

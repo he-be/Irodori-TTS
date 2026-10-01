@@ -1,0 +1,12 @@
+[ane] converted 3 shapes -> a_b1_b97ecbb2ae4b272d.mlpackage in 16.8 s
+[ane] compiled a_b1_b97ecbb2ae4b272d.mlmodelc in 0.2 s
+[ane] converted 3 shapes -> a_b2_cc5a62433597cf8e.mlpackage in 17.6 s
+[ane] compiled a_b2_cc5a62433597cf8e.mlmodelc in 0.1 s
+[ane] converted 3 shapes -> a_b3_072f6c0670c91a70.mlpackage in 18.1 s
+[ane] compiled a_b3_072f6c0670c91a70.mlmodelc in 0.1 s
+[ane] runner ready (dev, ne, 3 packages) in 71.5 s
+[ane] worker loaded a_b1 in 51.6 s
+B=1 S=180 bucket=192/CtxProfile(text=64, speaker=64, caption=16): MPS fp16 18.0 ms | ANE 14.6 ms (predict 15.7 ms, wait 15.7 ms)
+  ANE vs MPS16: max|d| 3.906e-02 mean|d| 2.909e-03 rel 3.530e-03
+[ane] WARNING: ANE compile of a_b3 failed after 7 s (aned log: {'Model load failed': 1, 'Compilation failed': 3}); its shapes use MPS from now on
+B=3: no ANE shape fits (S=180); skipping
