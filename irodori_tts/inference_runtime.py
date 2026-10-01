@@ -22,7 +22,7 @@ from safetensors import safe_open
 from safetensors.torch import load_file as load_safetensors_file
 
 from . import prebake as prebake_mod
-from .codec import DACVAECodec, patchify_latent, unpatchify_latent
+from .codec import DACVAECodec, gemm_conv_transpose_, patchify_latent, unpatchify_latent
 from .config import ModelConfig, merge_dataclass_overrides
 from .duration import build_duration_features
 from .fast_init import skip_random_init
@@ -701,7 +701,7 @@ def _build_codec(
         prepared_model = _prepare_codec_cpu(
             key=key, codec_dtype=codec_dtype, bundle=bundle, fold_weight_norm=fold_weight_norm
         )
-    return DACVAECodec.load(
+    codec = DACVAECodec.load(
         repo_id=key.codec_repo,
         device=str(codec_device),
         dtype=codec_dtype,
@@ -710,6 +710,9 @@ def _build_codec(
         fold_weight_norm=bool(fold_weight_norm),
         prepared_model=prepared_model,
     )
+    if get_opt_config().codec_convt_gemm:
+        gemm_conv_transpose_(codec.model)
+    return codec
 
 
 def _load_tokenizer_worker(
@@ -871,6 +874,9 @@ class InferenceRuntime:
             torch.mps.set_per_process_memory_fraction(fraction)
         with _load_phase("prewarm_rope"):
             self.model.prewarm_rope(max_latent_len=4096, max_speaker_len=4096)
+        if opt.fuse_qkv:
+            for block in self.model.blocks:
+                block.attention.fuse_self_projections_()
         # Keep the eager forward reachable for A/B checks (bench/check_equivalence.py).
         self._eager_forward_with_encoded_conditions = self.model.forward_with_encoded_conditions
         if opt.compile_dit and not key.compile_model:
@@ -879,6 +885,9 @@ class InferenceRuntime:
             self.model.forward_with_encoded_conditions = torch.compile(
                 self.model.forward_with_encoded_conditions, dynamic=True
             )
+            if opt.compiled_attention:
+                for block in self.model.blocks:
+                    block.attention.compiled_attention = True
         if opt.compile_codec:
             self.codec.model.decoder = torch.compile(self.codec.model.decoder, dynamic=True)
 

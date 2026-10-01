@@ -1,6 +1,6 @@
 # 19. M6 Mac mini の初回実測（GPU 単独 vs ANE）
 
-状態: **5 節の 0〜4 と 5 の一部を実測**（2026-10-01）。持続負荷・2 ワーカー・`full` の可否は未着手。
+状態: **5 節の 0〜4 と 5 の一部を実測、6 節でボトルネックを測って 3 件改善**（2026-10-01）。持続負荷・2 ワーカー・`full` の可否は未着手。
 凡例: **実測** / **導出** / **未確認**（12 節以降と同じ）。事前の見込みは 18 節。
 
 ## 1. 環境
@@ -85,7 +85,72 @@ wall 中央値 ms（括弧は RTF）。long は auto-step で 16 step。
 4. 次の手: (a) decode の内訳（conv / conv_transpose / Snake の時間配分、18 節 4-2-3 の fp32 監査）、(b) long で gb2 が効く理由と short の +57 ms、
    (c) 持続負荷（3 分原稿）でのクロック低下、(d) `full` の b1 系だけを使う shape セット（M1 の `m1` セットと同じ発想）が長文で効くか。
 
-## 6. 測定コマンド（M6 上）
+## 6. ボトルネックの測定と改善（2026-10-01、ANE off + compile）
+
+### 6-1. decode: MPS の ConvTranspose1d が NAX に乗っていない（実測、`bench/probe_decode_ops.py 180`）
+
+| 演算（short = 180 frame） | 単体 ms | 実効 TFLOPS | GEMM で書き直し |
+|---|---:|---:|---:|
+| ConvTranspose1d 1536→768 k24 s12 | 33.7 | 0.30 | 1.00 ms（10.2 TF） |
+| ConvTranspose1d 768→384 k20 s10 | 68.9 | 0.37 | 2.40 ms（10.6 TF） |
+| ConvTranspose1d 384→192 k16 s8 | 111.8 | 0.46 | 6.68 ms（7.6 TF） |
+| ConvTranspose1d 192→96 k4 s2 | 46.7 | 0.55 | 5.61 ms（4.6 TF） |
+| Conv1d k7（192ch, T=172800） | 4.7 | **19.1** | — |
+
+- 普通の Conv1d は 15〜19 TFLOPS（fp16 ピーク並み）で NAX に乗っている。**転置畳み込み 4 層だけが 0.3〜0.55 TFLOPS で、decode 543 ms のうち約 260 ms**。
+  Snake は eager だと 29 層で約 200 ms（hook 計測、上限）だが compile で融合される（96ch 単体 9.7 → 1.7 ms）。
+- 対策 `IRODORI_OPT_CONVT_GEMM`（既定 on、`codec.gemm_conv_transpose_`）: DACVAE の upsampler は全部 kernel = 2 × stride なので、
+  転置畳み込みを `(T, C_in) × (C_in, k·C_out)` の GEMM 1 回 + ずらし加算 2 回で書く。fp32 で元と SNR 117 dB（同値）、fp16 autocast の誤差も元と同じ（fp32 比 59.4 vs 59.8 dB）。
+- decode 単体（compile）: **341.6 → 89.7 ms（3.8×）**。M3 Pro でも 456 → 199 ms。
+
+### 6-2. DiT: attention が律速、GEMM は小さい形でも足りている（実測）
+
+`bench/probe_dit_ops.py`（B=3, S=180 = short の CFG step）: 1 step 289.7 GFLOP（ほぼ全部 mm）、eager 59.4 ms / compile 39.4 ms = **7.3 TFLOPS**。
+compile した step から部品を 1 つずつ抜いた差（in-pipeline の実コスト、数値は壊れる前提の計測）:
+
+| 抜いたもの | B=3 S=180 | B=3 S=750 |
+|---|---:|---:|
+| なし（基準） | 38.2 ms | 274.1 ms |
+| SDPA | −10.9（29%） | **−194.1（71%）** |
+| SwiGLU の w3 + silu | −4.8 | −15.8 |
+| AdaLN の norm + modulation | −1.2 | −2.4 |
+| RMSNorm（q/k/out） / RoPE | −0.3 / −0.3 | −1.6 / −1.4 |
+
+- **MPS の SDPA は 0.6〜0.8 TFLOPS**（S=750 で 1 層 15.8 ms）。それ以外の elementwise は compile で既に十分。
+- 外れた仮説（記録として）:
+  - AdaLN の変調は t だけの関数なので前計算できるが、compile 済み step では **差 0**（39.44 → 39.44 ms）。単体計測の 38 ms は呼び出しごとの sync の見かけ。
+  - wq/wk/wv/gate の GEMM 融合（`IRODORI_OPT_FUSE_QKV`、既定 on）: 単体では 540×1280×1280 が 5.6 TF と遅く 9.5 ms 減の見込みだったが、
+    step では **39.05 → 38.38 ms（−1.7%）** だけ。ビット一致なので残してある。小さい演算の単体計測は固定費で歪む。
+- attention を「matmul + fp32 softmax」に書き直して compile すると、**static shape では step が 273 → 120 ms（S=750）/ 38 → 32 ms（S=180）**だが、
+  runtime の `dynamic=True` の graph の中では **逆に遅い**（302 ms / 49 ms）。1 度これを既定にして端から端で short +36% になったので撤回した。
+- 採用（`IRODORI_OPT_COMPILED_ATTN`、既定 on、compile 時のみ）: attention 本体だけを graph の外（`torch.compiler.disable`）で
+  **static compile** し、S と L を 64 の倍数に詰め物して形の数を有限にする（詰めた key は −inf で mask、詰めた query 行は捨てる）。
+  graph break の固定費があるので **S ≥ 256 のときだけ**使う。新しい bucket の初回だけ 0.3〜0.7 s のコンパイルが乗る。
+
+### 6-3. 端から端（実測、fp16、sway 12 step、compile、ANE off、on→off→on）
+
+| 構成 | short | medium | long | caption_noref |
+|---|---:|---:|---:|---:|
+| 改善前（3 つとも off、`m6_opt_none`） | 720 (0.100) | 1221 (0.103) | 4576 (0.159) | 714 (0.097) |
+| + ConvT GEMM（`m6_convtgemm_compile`） | 467 (0.065) | 808 (0.068) | 3568 (0.124) | 457 (0.062) |
+| + QKV 融合（`m6_opt_all`、attention は旧） | 462 | 799 | 3579 | 453 |
+| **+ bucket 化 attention（`m6_battn_on`, `_on_b`）** | 477〜486 (0.066) | **737〜741 (0.062)** | **2020 (0.070)** | 457 (0.062) |
+| 同じ並びで attention だけ off（`m6_battn_off`） | 463 | 798 | 3583 | 454 |
+
+- **long は 4576 → 2020 ms（2.27×、RTF 0.159 → 0.070）、short は 720 → 463 ms（1.55×、RTF 0.064）**。M3 Pro 最良（short 1023 ms）の 2.2×、
+  5060 Ti（short 450 ms）とほぼ並んだ。
+- decode_latent は short 346 → 93 ms、long 1354 → 351 ms。sample_rf は long 3179 → 1631 ms。
+- short は bucket 化 attention を通らない（S=180 < 256）のに +3〜5% 遅い（sample_rf 338 → 350 ms）。graph の guard / 分割が変わったためと見られるが未解析。
+- 品質（`bench/audio_metrics.py`、fp32 モデル出力との距離）: ConvT GEMM + QKV 融合は改善前と SNR 65 dB / LSD 0.04 dB で実質同一。
+  bucket 化 attention は改善前と long で SNR 10.8 dB 離れるが、**fp32 との距離は変わらないか近づく**（long LSD 3.03 → 2.75 dB、short 0.74 → 0.75、caption 0.89 → 0.89）。
+  fp16 の 12〜16 step で丸め差が増幅されるいつもの種類の差（fp16 と fp32 の間は元から long で SNR 4.7 dB）。最終判断は聴感（`outputs/m6_wavs/` に long の on / off / fp32）。
+
+### 6-4. 残り
+
+- step はまだ 1 回 7〜8 TFLOPS（fp16 ピーク 18.7 の 40%）。attention を除くと GEMM が主で、M=540 程度の形では MPS の matmul が 10〜15 TF。
+- short の +3〜5%（6-3）、bucket の事前コンパイル（サーバー起動時に 64 刻みを温める）、持続負荷でのクロック低下（18 節 3-3）は未着手。
+
+## 7. 測定コマンド（M6 上）
 
 ```bash
 ~/.local/bin/uv run --no-sync python bench/probe_m1.py
@@ -95,6 +160,12 @@ bench/bench_runtime.py $COMMON --env IRODORI_OPT_ANE=0 [--env IRODORI_OPT_COMPIL
 bench/bench_runtime.py $COMMON --env IRODORI_OPT_COMPILE_DIT=1 --env IRODORI_OPT_COMPILE_CODEC=1 \
   --env IRODORI_OPT_ANE=1 --env IRODORI_OPT_ANE_SHAPES=dev --env IRODORI_OPT_ANE_GPU_BRANCHES={0,1,2}
 bench/check_ane.py --input short --shapes dev --skip-cpu
+bench/probe_decode_ops.py 180 --json results/m6_decode_ops_180.json      # 6-1
+bench/probe_dit_ops.py --json results/m6_dit_ops_b3_s180.json            # 6-2
+bench/bench_runtime.py $COMMON --env IRODORI_OPT_COMPILE_DIT=1 --env IRODORI_OPT_COMPILE_CODEC=1 --env IRODORI_OPT_ANE=0 \
+  [--env IRODORI_OPT_CONVT_GEMM=0 --env IRODORI_OPT_FUSE_QKV=0 --env IRODORI_OPT_COMPILED_ATTN=0] --save-wav-dir outputs/m6_wavs  # 6-3
 ```
+
+6-2 の部品抜き（ablation）と attention 変種の step 計測は使い捨てのスクリプトで取った（数値は本文のみ）。
 
 スクリプトは bash で回す（zsh は `$COMMON` を単語分割しない）。生データ: `results/m6_*.json`, `results/m6_check_ane_dev.txt`。

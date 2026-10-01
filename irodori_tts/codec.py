@@ -115,6 +115,58 @@ def fold_weight_norm_(model: torch.nn.Module) -> int:
     return count
 
 
+def _conv_transpose_gemm(module: torch.nn.ConvTranspose1d, x: torch.Tensor) -> torch.Tensor:
+    """``F.conv_transpose1d`` as one GEMM plus ``kernel // stride`` shifted adds.
+
+    With kernel = r * stride, output block ``t + j`` (``stride`` samples) receives tap block ``j``
+    of input frame ``t``, so the overlap-add is r slices of a single (T, C_in) x (C_in, k * C_out)
+    product. MPS's own conv_transpose kernels reach 0.3-0.55 TFLOPS on the M6 against 18.7 for
+    its matmul (19-m6-mini.md); this form keeps the contraction on the matmul path.
+    """
+    stride = int(module.stride[0])
+    r = int(module.kernel_size[0]) // stride
+    w = module._gemm_weight  # (C_in, r * stride * C_out), ordered (j, u, c)
+    bsz, _, frames = x.shape
+    cout = int(module.out_channels)
+    taps = torch.matmul(x.transpose(1, 2), w)
+    taps = taps.view(bsz, frames, r, stride * cout)
+    full = taps.new_zeros(bsz, frames + r - 1, stride * cout)
+    for j in range(r):
+        full[:, j : j + frames] += taps[:, :, j]
+    full = full.view(bsz, (frames + r - 1) * stride, cout)
+    pad = int(module.padding[0])
+    length = full.shape[1] - 2 * pad + int(module.output_padding[0])
+    y = full[:, pad : pad + length]
+    if module.bias is not None:
+        y = y + module.bias.to(y.dtype)
+    return y.transpose(1, 2)
+
+
+def gemm_conv_transpose_(model: torch.nn.Module) -> int:
+    """Route every ConvTranspose1d with kernel % stride == 0 (all of DACVAE's upsamplers,
+    kernel = 2 * stride) through :func:`_conv_transpose_gemm` (in place, weights must be final,
+    i.e. after :func:`fold_weight_norm_` and the device move)."""
+    count = 0
+    for module in model.modules():
+        if not isinstance(module, torch.nn.ConvTranspose1d):
+            continue
+        k, s = int(module.kernel_size[0]), int(module.stride[0])
+        if k % s or module.groups != 1 or module.dilation[0] != 1 or module._forward_pre_hooks:
+            continue
+        w = module.weight.detach()  # (C_in, C_out, k)
+        cin, cout = w.shape[0], w.shape[1]
+        module._gemm_weight = w.view(cin, cout, k // s, s).permute(0, 2, 3, 1).reshape(cin, k * cout).contiguous()
+        unpad = getattr(module, "unpad", None)
+
+        def forward(x: torch.Tensor, _m=module, _unpad=unpad) -> torch.Tensor:
+            y = _conv_transpose_gemm(_m, x)
+            return _unpad(y) if _unpad is not None else y
+
+        module.forward = forward
+        count += 1
+    return count
+
+
 @dataclass
 class DACVAECodec:
     model: torch.nn.Module

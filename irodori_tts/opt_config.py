@@ -8,6 +8,12 @@ memory), the MPS backend, batch size 1. Every switch can be toggled through an
     IRODORI_OPT_CROP_TEXT=0        disable text/caption padding crop
     IRODORI_OPT_FAST_SAMPLER=0     disable sync-free sampler + precomputed masks
     IRODORI_OPT_CODEC_FOLD_WN=0    disable codec weight-norm folding
+    IRODORI_OPT_COMPILED_ATTN=0    with COMPILE_DIT, keep MPS's fused SDPA for long latents instead of a
+                                   statically compiled, length-bucketed core (19-m6-mini.md)
+    IRODORI_OPT_FUSE_QKV=0         keep wq / wk / wv / gate as four GEMMs instead of one fused one
+                                   (19-m6-mini.md)
+    IRODORI_OPT_CONVT_GEMM=0       keep MPS's own conv_transpose1d for the codec upsamplers instead of
+                                   one matmul + shifted adds (19-m6-mini.md)
     IRODORI_OPT_REF_CACHE=0        disable reference latent / speaker state cache
     IRODORI_OPT_CPU_CAST=0         disable cast-on-CPU model loading
     IRODORI_OPT_WATERMARK=1        re-enable SilentCipher watermarking (default: off; the
@@ -152,6 +158,9 @@ class OptConfig:
     decode_chunk_frames: int = 0
     decode_overlap_frames: int = 16
     decode_autocast: bool = True
+    codec_convt_gemm: bool = True
+    fuse_qkv: bool = True
+    compiled_attention: bool = True
     decode_autocast_dtype: str = "fp16"
     encode_chunk_frames: int = 96
     encode_overlap_frames: int = 32
@@ -187,6 +196,9 @@ class OptConfig:
             decode_chunk_frames=max(0, _env_int("IRODORI_OPT_DECODE_CHUNK", 0)),
             decode_overlap_frames=max(0, _env_int("IRODORI_OPT_DECODE_OVERLAP", 16)),
             decode_autocast=_env_bool("IRODORI_OPT_DECODE_AUTOCAST", True),
+            codec_convt_gemm=_env_bool("IRODORI_OPT_CONVT_GEMM", True),
+            fuse_qkv=_env_bool("IRODORI_OPT_FUSE_QKV", True),
+            compiled_attention=_env_bool("IRODORI_OPT_COMPILED_ATTN", True),
             decode_autocast_dtype=_env_str(
                 "IRODORI_OPT_DECODE_AUTOCAST_DTYPE", "fp16", ("fp16", "bf16")
             ),

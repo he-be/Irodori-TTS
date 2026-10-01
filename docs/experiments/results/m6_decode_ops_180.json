@@ -1,0 +1,484 @@
+{
+ "frames": 180,
+ "chip": null,
+ "decode_eager_ms": 542.8307919937652,
+ "per_class_ms": {
+  "NormConv1d": 73.4452910546679,
+  "Snake1d": 203.34924999042414,
+  "NormConvTranspose1d": 267.7972909878008
+ },
+ "per_class_count": {
+  "NormConv1d": 27,
+  "Snake1d": 29,
+  "NormConvTranspose1d": 4
+ },
+ "hooked_total_ms": 557.2233750135638,
+ "convs": [
+  {
+   "kind": "NormConv1d",
+   "cin": 192,
+   "cout": 192,
+   "k": 7,
+   "stride": 1,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    192,
+    172800
+   ],
+   "count": 1,
+   "gflop": 89.178292224,
+   "ms": 4.670541500672698,
+   "tflops": 19.09378007050267,
+   "alt": "unfold+matmul",
+   "alt_ms": 13.825374990119599,
+   "alt_tflops": 6.450334424037821
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 192,
+   "cout": 192,
+   "k": 7,
+   "stride": 1,
+   "dilation": 3,
+   "in_shape": [
+    1,
+    192,
+    172800
+   ],
+   "count": 1,
+   "gflop": 89.172099072,
+   "ms": 4.673916497267783,
+   "tflops": 19.078667563728846,
+   "alt": "unfold+matmul",
+   "alt_ms": 13.81283299997449,
+   "alt_tflops": 6.455742936453708
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 192,
+   "cout": 192,
+   "k": 7,
+   "stride": 1,
+   "dilation": 9,
+   "in_shape": [
+    1,
+    192,
+    172800
+   ],
+   "count": 1,
+   "gflop": 89.153519616,
+   "ms": 4.652207993785851,
+   "tflops": 19.163700276317417,
+   "alt": "unfold+matmul",
+   "alt_ms": 13.873499992769212,
+   "alt_tflops": 6.4261736160641725
+  },
+  {
+   "kind": "NormConvTranspose1d",
+   "cin": 384,
+   "cout": 192,
+   "k": 16,
+   "stride": 8,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    384,
+    21600
+   ],
+   "count": 1,
+   "gflop": 50.9607936,
+   "ms": 111.80997951305471,
+   "tflops": 0.45578036792368715,
+   "alt": "matmul+fold",
+   "alt_ms": 6.675395983620547,
+   "alt_tflops": 7.63412293818116
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 384,
+   "cout": 384,
+   "k": 7,
+   "stride": 1,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    384,
+    21600
+   ],
+   "count": 1,
+   "gflop": 44.578308096,
+   "ms": 2.482624986441806,
+   "tflops": 17.956118358371697,
+   "alt": "unfold+matmul",
+   "alt_ms": 4.346875517512672,
+   "alt_tflops": 10.255252978007565
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 384,
+   "cout": 384,
+   "k": 7,
+   "stride": 1,
+   "dilation": 3,
+   "in_shape": [
+    1,
+    384,
+    21600
+   ],
+   "count": 1,
+   "gflop": 44.553535488,
+   "ms": 2.4962085008155555,
+   "tflops": 17.848483198997027,
+   "alt": "unfold+matmul",
+   "alt_ms": 4.329207993578166,
+   "alt_tflops": 10.291382524029695
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 384,
+   "cout": 384,
+   "k": 7,
+   "stride": 1,
+   "dilation": 9,
+   "in_shape": [
+    1,
+    384,
+    21600
+   ],
+   "count": 1,
+   "gflop": 44.479217664,
+   "ms": 2.476499998010695,
+   "tflops": 17.960515929630102,
+   "alt": "unfold+matmul",
+   "alt_ms": 4.351209005108103,
+   "alt_tflops": 10.222266411883137
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 96,
+   "cout": 96,
+   "k": 7,
+   "stride": 1,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    96,
+    345600
+   ],
+   "count": 1,
+   "gflop": 44.589920256,
+   "ms": 2.8538329934235662,
+   "tflops": 15.624572411473961,
+   "alt": "unfold+matmul",
+   "alt_ms": 13.728479505516589,
+   "alt_tflops": 3.2479868027688132
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 96,
+   "cout": 96,
+   "k": 7,
+   "stride": 1,
+   "dilation": 3,
+   "in_shape": [
+    1,
+    96,
+    345600
+   ],
+   "count": 1,
+   "gflop": 44.588371968,
+   "ms": 2.8678120143013075,
+   "tflops": 15.547871250153467,
+   "alt": "unfold+matmul",
+   "alt_ms": 13.695249988813885,
+   "alt_tflops": 3.2557545137488724
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 96,
+   "cout": 96,
+   "k": 7,
+   "stride": 1,
+   "dilation": 9,
+   "in_shape": [
+    1,
+    96,
+    345600
+   ],
+   "count": 1,
+   "gflop": 44.583727104,
+   "ms": 2.8909169923281297,
+   "tflops": 15.422001815450113,
+   "alt": "unfold+matmul",
+   "alt_ms": 13.765374998911284,
+   "alt_tflops": 3.2388312782998043
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 192,
+   "cout": 192,
+   "k": 1,
+   "stride": 1,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    192,
+    172800
+   ],
+   "count": 3,
+   "gflop": 12.7401984,
+   "ms": 1.254541493835859,
+   "tflops": 10.155262669747051,
+   "alt": "matmul",
+   "alt_ms": 1.6113125020638108,
+   "alt_tflops": 7.906721001470555
+  },
+  {
+   "kind": "NormConvTranspose1d",
+   "cin": 768,
+   "cout": 384,
+   "k": 20,
+   "stride": 10,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    768,
+    2160
+   ],
+   "count": 1,
+   "gflop": 25.4803968,
+   "ms": 68.9280630031135,
+   "tflops": 0.3696665144768256,
+   "alt": "matmul+fold",
+   "alt_ms": 2.3997289972612634,
+   "alt_tflops": 10.618030964779768
+  },
+  {
+   "kind": "NormConvTranspose1d",
+   "cin": 192,
+   "cout": 96,
+   "k": 4,
+   "stride": 2,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    192,
+    172800
+   ],
+   "count": 1,
+   "gflop": 25.4803968,
+   "ms": 46.65052100608591,
+   "tflops": 0.5461974754081715,
+   "alt": "matmul+fold",
+   "alt_ms": 5.605020487564616,
+   "alt_tflops": 4.545995301271636
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 384,
+   "cout": 384,
+   "k": 1,
+   "stride": 1,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    384,
+    21600
+   ],
+   "count": 3,
+   "gflop": 6.3700992,
+   "ms": 0.5386455013649538,
+   "tflops": 11.826143881008678,
+   "alt": "matmul",
+   "alt_ms": 1.3905414962209761,
+   "alt_tflops": 4.581020571706624
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 96,
+   "cout": 96,
+   "k": 1,
+   "stride": 1,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    96,
+    345600
+   ],
+   "count": 3,
+   "gflop": 6.3700992,
+   "ms": 1.2376039958326146,
+   "tflops": 5.1471223601814815,
+   "alt": "matmul",
+   "alt_ms": 1.4013539912411943,
+   "alt_tflops": 4.545674568891715
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 768,
+   "cout": 768,
+   "k": 7,
+   "stride": 1,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    768,
+    2160
+   ],
+   "count": 1,
+   "gflop": 17.786732544,
+   "ms": 1.3063959922874346,
+   "tflops": 13.6151156686085,
+   "alt": "unfold+matmul",
+   "alt_ms": 1.7269165109610185,
+   "alt_tflops": 10.299706112660763
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 768,
+   "cout": 768,
+   "k": 7,
+   "stride": 1,
+   "dilation": 3,
+   "in_shape": [
+    1,
+    768,
+    2160
+   ],
+   "count": 1,
+   "gflop": 17.687642112,
+   "ms": 1.3063125079497695,
+   "tflops": 13.54013071478615,
+   "alt": "unfold+matmul",
+   "alt_ms": 1.6951664874795824,
+   "alt_tflops": 10.434162215121681
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 768,
+   "cout": 768,
+   "k": 7,
+   "stride": 1,
+   "dilation": 9,
+   "in_shape": [
+    1,
+    768,
+    2160
+   ],
+   "count": 1,
+   "gflop": 17.390370816,
+   "ms": 1.2999999889871106,
+   "tflops": 13.377208433324398,
+   "alt": "unfold+matmul",
+   "alt_ms": 1.7011874879244715,
+   "alt_tflops": 10.222489254971578
+  },
+  {
+   "kind": "NormConvTranspose1d",
+   "cin": 1536,
+   "cout": 768,
+   "k": 24,
+   "stride": 12,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    1536,
+    180
+   ],
+   "count": 1,
+   "gflop": 10.19215872,
+   "ms": 33.734583004843444,
+   "tflops": 0.3021278999813533,
+   "alt": "matmul+fold",
+   "alt_ms": 0.9953334956662729,
+   "alt_tflops": 10.23994346053571
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 768,
+   "cout": 768,
+   "k": 1,
+   "stride": 1,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    768,
+    2160
+   ],
+   "count": 3,
+   "gflop": 2.54803968,
+   "ms": 0.3144790098303929,
+   "tflops": 8.102415742704823,
+   "alt": "matmul",
+   "alt_ms": 0.7707499898970127,
+   "alt_tflops": 3.3059224306191273
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 1024,
+   "cout": 1536,
+   "k": 7,
+   "stride": 1,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    1024,
+    180
+   ],
+   "count": 1,
+   "gflop": 3.831496704,
+   "ms": 1.2065204937243834,
+   "tflops": 3.1756582038425485,
+   "alt": "unfold+matmul",
+   "alt_ms": 0.46799999836366624,
+   "alt_tflops": 8.186958797855977
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 96,
+   "cout": 1,
+   "k": 7,
+   "stride": 1,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    96,
+    345600
+   ],
+   "count": 1,
+   "gflop": 0.464478336,
+   "ms": 1.5346455038525164,
+   "tflops": 0.30266164715824667,
+   "alt": "unfold+matmul",
+   "alt_ms": 11.438624991569668,
+   "alt_tflops": 0.04060613372169498
+  },
+  {
+   "kind": "NormConv1d",
+   "cin": 32,
+   "cout": 1024,
+   "k": 1,
+   "stride": 1,
+   "dilation": 1,
+   "in_shape": [
+    1,
+    32,
+    180
+   ],
+   "count": 1,
+   "gflop": 0.01179648,
+   "ms": 0.1469169947085902,
+   "tflops": 0.0802935019423608,
+   "alt": "matmul",
+   "alt_ms": 0.19520848582033068,
+   "alt_tflops": 0.06043015983873491
+  }
+ ],
+ "conv_total_ms": 308.0243094882462,
+ "conv_alt_total_ms": 61.83812142990064,
+ "snake_96ch_eager_ms": 9.727374985232018,
+ "snake_96ch_bytes_ms_at_140GBs": 0.9479314285714286,
+ "snake_96ch_compiled_ms": 1.735417012241669,
+ "decode_compiled_ms": 321.1539580079261
+}

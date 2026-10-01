@@ -238,6 +238,46 @@ class SelfAttention(nn.Module):
         return self.wo(y)
 
 
+# On the M6, MPS's fused SDPA reaches 0.6-0.8 TFLOPS. Two matmuls and an fp32 softmax compiled
+# with *static* shapes run 2.3x faster for the whole step at S=750 (-23% at S=400), but the same
+# code inside the runtime's dynamic=True graph is slower than SDPA, and a static compile per
+# request length would recompile constantly. So the attention core is compiled on its own,
+# statically, for S and L padded to multiples of ATTENTION_BUCKET; below
+# BUCKETED_ATTENTION_MIN_LEN the graph break costs more than it saves (19-m6-mini.md).
+ATTENTION_BUCKET = 64
+BUCKETED_ATTENTION_MIN_LEN = 256
+
+
+def _attention_core(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    scores = torch.matmul(q * (q.shape[-1] ** -0.5), k.transpose(-1, -2)) + mask
+    return torch.matmul(torch.softmax(scores.float(), dim=-1).to(v.dtype), v)
+
+
+_static_attention_core = None
+
+
+@torch.compiler.disable
+def _bucketed_attention(
+    q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, mask: torch.Tensor
+) -> torch.Tensor:
+    global _static_attention_core
+    if _static_attention_core is None:
+        # One entry per (batch, S bucket, L bucket); the default limit of 8 would fall back to eager.
+        torch._dynamo.config.cache_size_limit = max(torch._dynamo.config.cache_size_limit, 256)
+        _static_attention_core = torch.compile(_attention_core, dynamic=False)
+    seq, keys = q.shape[2], k.shape[2]
+    pad_s = -seq % ATTENTION_BUCKET
+    pad_l = -keys % ATTENTION_BUCKET
+    if pad_s:
+        q = F.pad(q, (0, 0, 0, pad_s))
+    if pad_l:
+        k = F.pad(k, (0, 0, 0, pad_l))
+        v = F.pad(v, (0, 0, 0, pad_l))
+        mask = F.pad(mask, (0, pad_l), value=float("-inf"))
+    y = _static_attention_core(q, k, v, mask)
+    return y[:, :, :seq] if pad_s else y
+
+
 class JointAttention(nn.Module):
     """
     Echo-style joint attention over latent self tokens + conditioning contexts.
@@ -279,6 +319,44 @@ class JointAttention(nn.Module):
 
         self.q_norm = RMSNorm((self.heads, self.head_dim), eps=norm_eps)
         self.k_norm = RMSNorm((self.heads, self.head_dim), eps=norm_eps)
+        self.register_buffer("_wqkvg", None, persistent=False)
+        # Set by the runtime when the forward is torch.compile'd (see _attend).
+        self.compiled_attention = False
+
+    def fuse_self_projections_(self) -> None:
+        """Run wq / wk / wv / gate as one (dim -> 4*dim) GEMM at inference.
+
+        On the M6's GPU a 540x1280x1280 matmul takes nearly as long as a 540x1280x3680 one
+        (5.6 vs 15 TFLOPS), so four narrow GEMMs cost ~2.7x one wide one (19-m6-mini.md). The
+        four Linear weights become views into the fused buffer, so no memory is duplicated.
+        """
+        lins = (self.wq, self.wk, self.wv, self.gate)
+        fused = torch.cat([lin.weight.detach() for lin in lins], dim=0).contiguous()
+        self.register_buffer("_wqkvg", fused, persistent=False)
+        for i, lin in enumerate(lins):
+            lin.weight = nn.Parameter(fused[i * self.dim : (i + 1) * self.dim], requires_grad=False)
+
+    def _attend(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        """Attention over (B, H, S, D) with an additive (B, 1, 1, L) mask.
+
+        With the forward compiled (``compiled_attention``) and S >= ``BUCKETED_ATTENTION_MIN_LEN``
+        the call leaves the dynamic graph for :func:`_bucketed_attention`; shorter sequences keep
+        MPS's fused SDPA, which is as fast there (19-m6-mini.md).
+        """
+        if self.compiled_attention and q.shape[2] >= BUCKETED_ATTENTION_MIN_LEN:
+            return _bucketed_attention(q, k, v, mask)
+        return F.scaled_dot_product_attention(q, k, v, attn_mask=mask, is_causal=False)
+
+    def _self_projections(
+        self, x: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]:
+        # A LoRA adapter replaces these Linears with wrappers; then the fused weight is stale.
+        if self._wqkvg is not None and all(
+            type(lin) is nn.Linear for lin in (self.wq, self.wk, self.wv, self.gate)
+        ):
+            q, k, v, g = F.linear(x, self._wqkvg).split(self.dim, dim=-1)
+            return q, k, v, g
+        return self.wq(x), self.wk(x), self.wv(x), None
 
     def _apply_rotary_half(self, x: torch.Tensor, freqs_cis: torch.Tensor) -> torch.Tensor:
         x_rot, x_passthrough = x.chunk(2, dim=-2)
@@ -360,9 +438,10 @@ class JointAttention(nn.Module):
         attn_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         bsz, seq_len, _ = x.shape
-        q = self.wq(x).reshape(bsz, seq_len, self.heads, self.head_dim)
-        k_self = self.wk(x).reshape(bsz, seq_len, self.heads, self.head_dim)
-        v_self = self.wv(x).reshape(bsz, seq_len, self.heads, self.head_dim)
+        q, k_self, v_self, gate_pre = self._self_projections(x)
+        q = q.reshape(bsz, seq_len, self.heads, self.head_dim)
+        k_self = k_self.reshape(bsz, seq_len, self.heads, self.head_dim)
+        v_self = v_self.reshape(bsz, seq_len, self.heads, self.head_dim)
         if attn_mask is not None and context_kv is not None:
             # Fast path: precomputed context K/V and a precombined (B,1,1,L) mask.
             # Key order must match the mask layout: [self, text, speaker?, caption?].
@@ -372,15 +451,9 @@ class JointAttention(nn.Module):
             k_self = self._apply_rotary_half(k_self, freqs_cis[:seq_len])
             k = torch.cat([k_self, *context_kv[0::2]], dim=1)
             v = torch.cat([v_self, *context_kv[1::2]], dim=1)
-            y = F.scaled_dot_product_attention(
-                q.transpose(1, 2),
-                k.transpose(1, 2),
-                v.transpose(1, 2),
-                attn_mask=attn_mask,
-                is_causal=False,
-            ).transpose(1, 2)
+            y = self._attend(q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2), attn_mask).transpose(1, 2)
             y = y.reshape(bsz, seq_len, self.dim)
-            y = y * torch.sigmoid(self.gate(x))
+            y = y * torch.sigmoid(gate_pre if gate_pre is not None else self.gate(x))
             return self.wo(y)
         if context_kv is None:
             projected = self.project_context_kv(
@@ -467,7 +540,7 @@ class JointAttention(nn.Module):
             is_causal=False,
         ).transpose(1, 2)
         y = y.reshape(bsz, seq_len, self.dim)
-        y = y * torch.sigmoid(self.gate(x))
+        y = y * torch.sigmoid(gate_pre if gate_pre is not None else self.gate(x))
         return self.wo(y)
 
 
